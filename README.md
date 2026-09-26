@@ -1,0 +1,78 @@
+# המאמנת · Fit Coach
+
+A Hebrew, chat-first mobile app for tracking diet and training every day, powered by Claude.
+You tell the coach what you ate (or send a photo of your plate or a nutrition label), what workout you did, or what you weighed. Claude logs it, works out calories and macros, and keeps you on track toward your weight and fitness goals.
+
+**Live app:** https://alonaviram-arch.github.io/fit-coach/
+
+<p align="center">
+  <img src="docs/screenshots/3-chat.png" width="220" alt="Chat">
+  <img src="docs/screenshots/4-today.png" width="220" alt="Daily log">
+  <img src="docs/screenshots/6-weight.png" width="220" alt="Weight">
+</p>
+
+## Features
+
+| Area | What it does |
+|---|---|
+| **Chat coach (Hebrew)** | A dietitian and fitness-coach persona. It logs meals item by item (calories, protein, carbs, fat), shows running totals against your daily targets, suggests portions that fit what's left, and writes end-of-day and weekly summaries. It speaks to you in feminine or masculine Hebrew based on your profile. |
+| **Photos** | Photograph a meal, a restaurant plate or a nutrition label. Claude reads it and logs the values. |
+| **Profile and goals** | Height, weight, age, sex, optional circumferences (waist, hips, chest, arm, thigh) and body-fat %. Goal type (lose, maintain or gain), target weight and date, fitness goals, food preferences and restrictions. |
+| **Daily targets** | Worked out automatically (Mifflin-St Jeor BMR × activity, with a deficit or surplus sized to your goal date and kept within safe limits). You can override them manually, or agree on new ones with the coach in chat. |
+| **Daily log** | Meals grouped by type, macro progress bars, a day-by-day browser, delete, and manual add. |
+| **Workouts** | Log type, duration, intensity, calories burned, and exercises (sets × reps × kg). Shows a weekly count against your training-days goal. The coach can also log workouts straight from chat. |
+| **Weekly weigh-ins** | Weight plus optional measurements, a trend chart with a goal line, progress toward the goal, average weekly change, and a reminder when a weigh-in is due. |
+| **Installable PWA** | Add it to your home screen on iPhone or Android. The app shell works offline. |
+| **Private by design** | All data stays in your phone's browser. Nothing is stored on a server. You can export and import a JSON backup. |
+
+## Claude connection: API key vs. your claude.ai account
+
+The app talks to Claude through the **Claude API**. A claude.ai subscription (Pro or Max) **can't** be used by third-party apps, so you need an API key:
+
+1. Sign in at [console.anthropic.com](https://console.anthropic.com) with the same email you use for Claude.
+2. Add credit under **Billing** (usage is pay-as-you-go and separate from a claude.ai subscription).
+3. Create a key under **Settings → API keys** and paste it into the app's profile screen.
+
+The key is stored only on your device and is sent only to `api.anthropic.com`.
+
+**Models** (choose in the profile screen):
+
+| Model | Best for | Price per 1M tokens (input / output) |
+|---|---|---|
+| Claude Opus 5 *(default)* | Most accurate nutrition estimates | $5 / $25 |
+| Claude Sonnet 5 | A good balance of quality and cost | $2 / $10 |
+| Claude Haiku 4.5 | Cheapest and fastest | $1 / $5 |
+
+A typical day of logging is roughly 10–20 messages. The stable system prompt is cached to keep costs down.
+
+## Install on your phone
+
+1. Open the live app link on your phone.
+2. **iPhone (Safari):** tap Share → *Add to Home Screen*. **Android (Chrome):** tap ⋮ → *Install app*.
+3. Fill in your profile, paste your API key, and start chatting.
+
+Full Hebrew user guide: [docs/USER_GUIDE.he.md](docs/USER_GUIDE.he.md)
+
+## Development
+
+```bash
+npm install
+npm run dev      # http://localhost:5173/fit-coach/
+npm run build    # type-check + production build to dist/
+npm run lint
+```
+
+Stack: React 19 + TypeScript + Vite, `@anthropic-ai/sdk` (browser mode), `zod` for validating tool input, and `marked` + `DOMPurify` for rendering Claude's markdown.
+
+Every push to `main` deploys to GitHub Pages through [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): data model, the Claude tool loop, prompt and caching design, and how targets are calculated
+- [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md): how the original Gemini dietitian conversation maps to app features
+- [docs/USER_GUIDE.he.md](docs/USER_GUIDE.he.md): user guide (Hebrew)
+- [CHANGELOG.md](CHANGELOG.md)
+
+## Disclaimer
+
+The coach is an AI assistant, not a doctor or registered dietitian. Nutrition values are estimates. For medical conditions, pregnancy or eating-disorder concerns, consult a professional.
