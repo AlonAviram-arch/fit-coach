@@ -1,7 +1,7 @@
 import type { AppData } from './types';
 import {
-  activeTargets, addDays, computeTargets, currentWeight, daysBetween, entriesForDate,
-  hebrewWeekday, MEAL_LABELS, nowTime, roundTotals, sumEntries, sumItems, today,
+  activeTargets, adaptiveEstimate, addDays, computeTargets, currentWeight, daysBetween, entriesForDate,
+  hebrewWeekday, MEAL_LABELS, nowTime, roundTotals, SLEEP_GOAL_HOURS, stepsGoal, sumEntries, sumItems, today, waterGoalMl,
 } from './nutrition';
 
 /**
@@ -23,11 +23,25 @@ export const SYSTEM_PROMPT = `You are "המאמנת" — a warm, precise persona
    - Call \`log_food\` once per meal/snack with all items. Use the date the user means ("אתמול" → yesterday's date).
    - Reply with: a table (רכיב | כמות | קלוריות | חלבון | פחמימות | שומן), the meal total, and the day's running total vs targets with what's left ("נשארו ...").
 2. **Corrections** ("זה בורגול מלא", "לקחתי רק 85 גרם") → call \`update_food_entry\` on the existing entry (ids are in <app_state>), never log a duplicate. Mistakenly logged → \`delete_food_entry\`.
-3. **Planning questions** ("כמה לשים מכל דבר?", "מה עדיף לערב?", "מה לאכול לפני אימון?") → recommend concrete grams that fit the remaining budget and the user's preferences. Do NOT log until the user says what they actually ate.
+3. **Meal suggestions and planning** ("מה לאכול לערב?", "מה עדיף?", "כמה לשים מכל דבר?", "מה לאכול לפני אימון?", "יש לי בבית עוף, אורז וירקות"):
+   - Call \`suggest_meal\` once per option (1–3 options). Each call shows a card with items, grams and macros and a one-tap "אכלתי את זה" button, so keep your text short: one line per option on why it fits. Don't repeat the card's table.
+   - Fit the remaining budget for the day (especially protein), the user's preferences and restrictions, the time of day, and training (carbs before/after workouts).
+   - Prefer the user's favorites and foods they often log. Adapt them before inventing something new.
+   - Suggesting is not logging. Log only when the user says what they ate, or they tap the card (an event note "[נרשם בלחיצה: …]" appears in the chat and the entry shows up in <app_state>).
 4. **Workouts** ("עשיתי אימון קרוספיט", "הליכה 40 דקות") → call \`log_workout\` (estimate calories burned when not given). On training days suggest ~30–50 g extra carbs around the workout; do not tell the user to "eat back" all burned calories.
 5. **Weigh-ins / measurements** ("שקלתי 79.4") → call \`log_weigh_in\`. Comment on the trend (weekly averages beat single days). If <app_state> shows more than 7 days since the last weigh-in, gently remind once.
 6. **End of day** ("סיימתי", "זהו", "נחתום", "שתיתי רק מים") → a daily summary vs targets with a short status per macro, plus 1–2 concrete insights for tomorrow (e.g. hidden snack calories, protein gaps, carbs on training days).
 7. **Weekly / progress summary** → call \`get_history\` for the needed range, then report average intake, average daily deficit vs TDEE, estimated fat change (7,700 kcal ≈ 1 kg), weight trend, workouts done, and time-to-goal at the current pace.
+8. **Water, steps, sleep** ("שתיתי 2 כוסות מים", "עשיתי 9,000 צעדים", "ישנתי 6 שעות") → call \`log_daily_metrics\`. Connect them to the plan when relevant: short sleep often means more hunger and cravings, so suggest a protein-rich breakfast; low water intake; more steps on rest days.
+
+# Favorites
+- Favorites (saved meals) are listed in <app_state> with ids. When the user names one ("הקערה הרגילה", "כמו אתמול בבוקר") call \`log_favorite\` (with portion for "חצי"/"כפול").
+- When the user logs essentially the same meal for the third time, or asks to save a meal, offer to save it (or save it if asked) with \`save_favorite\`, using from_entry_id when it's already logged.
+
+# Adaptive targets
+- <app_state> may include "adaptive estimate": the TDEE implied by the user's actual logged intake and weight trend over the last 4 weeks.
+- If it shows plateau=yes, or differs=yes by a meaningful amount, raise it once, gently: explain what the real data shows, check that logging has been complete (missing days or untracked snacks make the estimate too low), then offer the recommended targets. Apply them with \`set_targets\` only after the user agrees.
+- If the plateau comes from eating above target (a large positive gap vs target), the target is fine and the gap is the issue: point to where the extra calories come from (snacks, weekends, drinks) instead of lowering the target.
 
 # Profile and goals
 - Profile, goals, preferences and targets are in <app_state>. If the user shares new info (new goal, food they dislike, injury, new training schedule, age...), call \`update_profile\`.
@@ -84,6 +98,12 @@ export function buildAppState(data: AppData): string {
   const tot = roundTotals(sumEntries(todays));
   lines.push(`today's totals: ${tot.calories} kcal, P${tot.protein} C${tot.carbs} F${tot.fat}`);
 
+  const m = data.metrics.find((x) => x.date === date);
+  lines.push(
+    `today's lifestyle: water ${m?.waterMl ?? 0}/${waterGoalMl(data)} ml, steps ${m?.steps ?? '-'}/${stepsGoal(data)}, ` +
+      `sleep last night ${m?.sleepHours ?? '-'} h (goal ${SLEEP_GOAL_HOURS}+)`,
+  );
+
   const todaysWorkouts = data.workouts.filter((w) => w.date === date);
   if (todaysWorkouts.length) {
     lines.push(`today's workouts: ${todaysWorkouts.map((w) => `${w.type} ${w.durationMin}min${w.caloriesBurned ? ` ~${w.caloriesBurned}kcal` : ''}`).join('; ')}`);
@@ -94,11 +114,14 @@ export function buildAppState(data: AppData): string {
     const d = addDays(date, -i);
     const entries = entriesForDate(data, d);
     const w = data.workouts.filter((x) => x.date === d);
-    if (!entries.length && !w.length) continue;
+    const dm = data.metrics.find((x) => x.date === d);
+    if (!entries.length && !w.length && !dm) continue;
     const s = roundTotals(sumEntries(entries));
+    const life = [dm?.waterMl && `water ${dm.waterMl}ml`, dm?.steps && `steps ${dm.steps}`, dm?.sleepHours && `sleep ${dm.sleepHours}h`].filter(Boolean);
     lines.push(
       `- ${d}: ${entries.length ? `${s.calories}kcal P${s.protein} C${s.carbs} F${s.fat}` : 'no food logged'}` +
-        (w.length ? `; workouts: ${w.map((x) => x.type).join(', ')}` : ''),
+        (w.length ? `; workouts: ${w.map((x) => x.type).join(', ')}` : '') +
+        (life.length ? `; ${life.join(', ')}` : ''),
     );
   }
 
@@ -109,6 +132,26 @@ export function buildAppState(data: AppData): string {
     lines.push(`days since last weigh-in: ${daysBetween(last.date, date)}`);
   } else {
     lines.push('\nno weigh-ins logged yet');
+  }
+
+  if (data.favorites.length) {
+    lines.push('\nfavorites:');
+    for (const f of [...data.favorites].sort((a, b) => b.uses - a.uses).slice(0, 15)) {
+      const t = roundTotals(sumItems(f.items));
+      lines.push(
+        `- id=${f.id} "${f.name}"${f.meal ? ` (${MEAL_LABELS[f.meal]})` : ''}: ${f.items.map((i) => `${i.name} ${i.amount}`).join(', ')} → ${t.calories}kcal P${t.protein}; used ${f.uses}x`,
+      );
+    }
+  }
+
+  const est = adaptiveEstimate(data);
+  if (est) {
+    lines.push(
+      `\nadaptive estimate (last ${est.windowDays} days, ${est.loggedDays} complete logged days): avg intake ${est.avgIntake} kcal ` +
+        `(${est.intakeGap >= 0 ? '+' : ''}${est.intakeGap} vs target), ` +
+        `weight trend ${est.weeklyChangeKg} kg/week → real TDEE ≈ ${est.tdee}; recommended ${est.recommended.calories} kcal ` +
+        `P${est.recommended.protein} C${est.recommended.carbs} F${est.recommended.fat}; plateau=${est.plateau ? 'yes' : 'no'}; differs=${est.differs ? 'yes' : 'no'}`,
+    );
   }
 
   return `<app_state>\n${lines.join('\n')}\n</app_state>`;

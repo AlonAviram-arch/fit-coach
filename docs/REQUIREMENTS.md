@@ -30,7 +30,14 @@ This app is based on a long Hebrew conversation (about 200 messages over several
 - **Editable targets:** calculated automatically, with a manual override (e.g. from a real dietitian).
 - **Privacy:** everything stays on the phone.
 
-## Out of scope for v1
+## Added in v1.1
+
+- **Suggestion cards** with one-tap logging, portion scaling and item removal (in the Gemini chat, suggested portions had to be retyped as "I ate…").
+- **Favorite meals**, based on how often the same breakfast bowl and snacks repeated in the conversation.
+- **Adaptive targets** from the real intake and weight trend, including detecting a plateau caused by eating over target. This answers the conversation's "am I eating too little / why isn't it moving?" questions with data.
+- **Water, steps and sleep** tracking ("I only drank water" came up at the end of almost every day).
+
+## Out of scope for now
 
 - Syncing across devices (the JSON backup covers moving between devices).
 - Push reminders (the weigh-in reminder appears inside the app).

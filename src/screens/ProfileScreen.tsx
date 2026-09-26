@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MODELS } from '../lib/models';
-import { ACTIVITY_LABELS, addDays, computeTargets, currentWeight, today } from '../lib/nutrition';
+import { ACTIVITY_LABELS, adaptiveEstimate, addDays, computeTargets, currentWeight, today } from '../lib/nutrition';
 import {
   addWeighIn, exportJson, getData, importJson, resetAll, saveProfile, saveSettings, useData,
 } from '../lib/store';
@@ -23,6 +23,7 @@ function toForm(p: Profile | null, weight: number | null): Form {
     thighCm: p?.thighCm ? String(p.thighCm) : '',
     activityLevel: p?.activityLevel ?? 'moderate',
     trainingDaysPerWeek: p ? String(p.trainingDaysPerWeek) : '3',
+    stepsGoal: p?.stepsGoal ? String(p.stepsGoal) : '8000',
     trainingTypes: p?.trainingTypes ?? '',
     goalType: p?.goalType ?? 'lose',
     targetWeightKg: p?.targetWeightKg ? String(p.targetWeightKg) : '',
@@ -63,6 +64,7 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
       thighCm: optNum(form.thighCm),
       activityLevel: form.activityLevel as ActivityLevel,
       trainingDaysPerWeek: Number(form.trainingDaysPerWeek) || 0,
+      stepsGoal: optNum(form.stepsGoal),
       trainingTypes: form.trainingTypes.trim(),
       goalType: form.goalType as GoalType,
       targetWeightKg: Number(form.targetWeightKg) || weightKg,
@@ -71,6 +73,8 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
       foodPreferences: form.foodPreferences.trim(),
       restrictions: form.restrictions.trim(),
       customTargets: custom ?? undefined,
+      targetsSetAt:
+        JSON.stringify(custom ?? null) === JSON.stringify(data.profile?.customTargets ?? null) ? data.profile?.targetsSetAt : today(),
       createdAt: data.profile?.createdAt ?? now,
       updatedAt: now,
     };
@@ -78,6 +82,13 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
 
   const preview = buildProfile();
   const computed = preview ? computeTargets(preview, preview.weightKg) : null;
+  const adaptive = adaptiveEstimate(data);
+
+  function applyAdaptive() {
+    if (!adaptive || !data.profile) return;
+    setCustom(adaptive.recommended);
+    saveProfile({ ...data.profile, customTargets: adaptive.recommended, targetsSetAt: today(), updatedAt: new Date().toISOString() });
+  }
 
   function save(e: React.FormEvent) {
     e.preventDefault();
@@ -164,6 +175,7 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
           </label>
           <div className="grid2">
             <label>אימונים בשבוע<input inputMode="numeric" value={form.trainingDaysPerWeek} onChange={set('trainingDaysPerWeek')} /></label>
+            <label>יעד צעדים יומי<input inputMode="numeric" value={form.stepsGoal} onChange={set('stepsGoal')} /></label>
             <label>סוגי אימון<input value={form.trainingTypes} onChange={set('trainingTypes')} placeholder="קרוספיט, ריצה…" /></label>
           </div>
         </section>
@@ -198,6 +210,38 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
               {computed.dailyDelta < 0 ? `גירעון ${-computed.dailyDelta}` : computed.dailyDelta > 0 ? `עודף ${computed.dailyDelta}` : 'איזון'} קק״ל ביום
               {computed.weeklyRateKg !== 0 && ` · ${computed.weeklyRateKg > 0 ? '+' : ''}${computed.weeklyRateKg} ק״ג/שבוע`}
             </p>
+            {adaptive ? (
+              <div className={adaptive.plateau || adaptive.differs ? 'adaptive attention' : 'adaptive'}>
+                <strong>📊 לפי הנתונים שלך בפועל</strong>
+                <p className="small">
+                  ב-4 השבועות האחרונים ({adaptive.loggedDays} ימים עם רישום מלא): ממוצע {adaptive.avgIntake} קק״ל ביום,
+                  משקל {adaptive.weeklyChangeKg > 0 ? '+' : ''}{adaptive.weeklyChangeKg} ק״ג בשבוע.
+                  המשמעות: הוצאה אנרגטית אמיתית של כ-<strong>{adaptive.tdee}</strong> קק״ל (לפי הנוסחה: {computed.tdee}).
+                </p>
+                {adaptive.plateau && <p className="small">⚠️ המשקל כמעט לא זז כבר שלושה שבועות.</p>}
+                {adaptive.plateau && adaptive.intakeGap > 100 && !adaptive.differs ? (
+                  <p className="small">
+                    הצריכה הממוצעת גבוהה מהיעד בכ-<strong>{adaptive.intakeGap}</strong> קק״ל ביום. זו כנראה הסיבה לעצירה, והיעד עצמו מתאים.
+                    כדאי לבדוק מאיפה מגיעות הקלוריות העודפות (נשנושים, סופי שבוע, שתייה). המאמנת בצ׳אט יכולה לעזור לאתר אותן.
+                  </p>
+                ) : adaptive.differs ? (
+                  <>
+                    <p className="small">
+                      כדי להגיע ליעד בקצב המתוכנן, מומלץ: <strong>{adaptive.recommended.calories}</strong> קק״ל ·
+                      חלבון {adaptive.recommended.protein} · פחמ׳ {adaptive.recommended.carbs} · שומן {adaptive.recommended.fat}
+                    </p>
+                    <button type="button" className="btn primary" onClick={applyAdaptive}>עדכון היעדים לפי הנתונים</button>
+                  </>
+                ) : (
+                  <p className="small">היעדים הנוכחיים מתאימים לנתונים שלך 👍</p>
+                )}
+                <p className="muted small">ההערכה מבוססת על מה שנרשם. אם חלק מהארוחות או מהנשנושים לא נרשמו, היא תצא נמוכה מדי.</p>
+              </div>
+            ) : (
+              <p className="muted small">
+                אחרי כ-3 שבועות של רישום ושקילות, היעדים יותאמו גם לפי הנתונים שלך בפועל ולא רק לפי נוסחה.
+              </p>
+            )}
             {computed.clamped && (
               <p className="warn small">הקצב שביקשת מהיר מדי, אז הגבלתי את הגירעון לטווח בטוח. כדאי לשקול תאריך יעד מאוחר יותר.</p>
             )}

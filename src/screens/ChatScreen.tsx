@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Tab } from '../App';
+import FavoritesSheet from '../components/FavoritesSheet';
 import MacroBars from '../components/MacroBars';
+import SuggestionCard from '../components/SuggestionCard';
 import type { ImageInput } from '../lib/claude';
 import { fileToImage, renderMarkdown } from '../lib/media';
 import { activeTargets, entriesForDate, sumEntries, today } from '../lib/nutrition';
 import { addChatMessage, clearChat, getData, updateChatMessage, useData } from '../lib/store';
-import type { ActionChip } from '../lib/types';
+import type { ActionChip, MealSuggestion } from '../lib/types';
 
-const QUICK_PROMPTS = ['מה נשאר לי להיום?', 'מה לאכול לארוחת ערב?', 'סיימתי להיום', 'סיכום שבועי'];
+const QUICK_PROMPTS = ['מה לאכול עכשיו?', 'מה נשאר לי להיום?', 'סיימתי להיום', 'סיכום שבועי'];
 
 type PendingImage = ImageInput & { previewUrl: string };
 
@@ -16,6 +18,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
   const [text, setText] = useState('');
   const [images, setImages] = useState<PendingImage[]>([]);
   const [busy, setBusy] = useState(false);
+  const [showFavorites, setShowFavorites] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -44,6 +47,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
     addChatMessage({ role: 'user', text: trimmed, images: sentImages.length || undefined });
     const reply = addChatMessage({ role: 'assistant', text: '' });
     const actions: ActionChip[] = [];
+    const suggestions: MealSuggestion[] = [];
 
     // The SDK is loaded on first send to keep the initial bundle small.
     const claude = import('../lib/claude');
@@ -55,8 +59,13 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
           actions.push(chip);
           updateChatMessage(reply.id, { actions: [...actions] });
         },
+        onSuggestion: (s) => {
+          suggestions.push(s);
+          updateChatMessage(reply.id, { suggestions: [...suggestions] });
+        },
       });
-      updateChatMessage(reply.id, { text: finalText || (actions.length ? 'רשמתי ✔️' : '') });
+      const fallback = suggestions.length ? '' : actions.length ? 'רשמתי ✔️' : '';
+      updateChatMessage(reply.id, { text: finalText || fallback });
     } catch (err) {
       const text = await claude.then((c) => c.friendlyError(err), () => 'אין חיבור לאינטרנט.');
       updateChatMessage(reply.id, { text, error: true });
@@ -95,18 +104,25 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
             <p>ספרו לי מה אכלתם (אפשר גם לצלם צלחת או תווית), איזה אימון עשיתם, או כמה שקלתם — ואני ארשום, אחשב ואעדכן מול היעדים.</p>
           </div>
         )}
-        {data.chat.map((m) => (
-          <div key={m.id} className={`msg ${m.role}${m.error ? ' error' : ''}`}>
+        {data.chat.map((m) => m.kind === 'event' ? (
+          <div key={m.id} className="event-note">{m.text.replace(/^\[|\]$/g, '')}</div>
+        ) : (
+          <div key={m.id} className={`msg ${m.role}${m.error ? ' error' : ''}${m.suggestions?.length ? ' has-cards' : ''}`}>
             {m.images ? <div className="msg-images">📷 {m.images} תמונות</div> : null}
             {m.role === 'assistant' ? (
               m.text ? (
                 <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.text) }} />
-              ) : (
+              ) : m.suggestions?.length ? null : (
                 <div className="typing"><span /><span /><span /></div>
               )
             ) : (
               <div className="plain">{m.text}</div>
             )}
+            {m.suggestions?.length ? (
+              <div className="suggestions">
+                {m.suggestions.map((s) => <SuggestionCard key={s.id} messageId={m.id} suggestion={s} />)}
+              </div>
+            ) : null}
             {m.actions?.length ? (
               <div className="chips">
                 {m.actions.map((a, i) => (
@@ -146,6 +162,9 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
           <button type="button" className="icon-btn" onClick={() => fileRef.current?.click()} aria-label="צירוף תמונה" disabled={busy}>
             📷
           </button>
+          <button type="button" className="icon-btn" onClick={() => setShowFavorites(true)} aria-label="מועדפים" disabled={busy}>
+            ⭐
+          </button>
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }} />
           <textarea
             value={text}
@@ -165,6 +184,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
           </button>
         </form>
       </div>
+      {showFavorites && <FavoritesSheet onClose={() => setShowFavorites(false)} />}
     </div>
   );
 }

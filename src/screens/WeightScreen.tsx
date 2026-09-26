@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import WeightChart from '../components/WeightChart';
-import { daysBetween, formatDate, r1, today } from '../lib/nutrition';
+import { adaptiveEstimate, daysBetween, formatDate, r1, today } from '../lib/nutrition';
 import { addWeighIn, deleteWeighIn, useData } from '../lib/store';
 import type { WeighIn } from '../lib/types';
 
@@ -29,6 +29,7 @@ export default function WeightScreen() {
   const target = p?.targetWeightKg;
   const daysSince = last ? daysBetween(last.date, today()) : null;
   const due = daysSince === null || daysSince >= 7;
+  const adaptive = adaptiveEstimate(data);
 
   let progressPct = 0;
   if (start && current && target && start !== target) {
@@ -65,6 +66,16 @@ export default function WeightScreen() {
         <div className="banner">
           {daysSince === null ? 'עוד לא נרשמה שקילה. ' : `עברו ${daysSince} ימים מהשקילה האחרונה. `}
           מומלץ להישקל פעם בשבוע, באותו יום, בבוקר אחרי שירותים ולפני אוכל.
+        </div>
+      )}
+
+      {adaptive?.plateau && (
+        <div className="banner">
+          ⚠️ המשקל כמעט לא זז בשבועות האחרונים.{' '}
+          {adaptive.intakeGap > 100
+            ? `הצריכה הממוצעת (${adaptive.avgIntake} קק״ל) גבוהה מהיעד בכ-${adaptive.intakeGap} קק״ל ביום.`
+            : `לפי הרישום, ההוצאה האנרגטית שלך בפועל היא כ-${adaptive.tdee} קק״ל, ובמסך הפרופיל יש המלצה לעדכון היעדים.`}{' '}
+          אפשר גם לשאול את המאמנת בצ׳אט.
         </div>
       )}
 

@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import FavoritesSheet from '../components/FavoritesSheet';
+import LifestyleCard from '../components/LifestyleCard';
 import MacroBars from '../components/MacroBars';
 import {
   activeTargets, addDays, entriesForDate, formatDate, MEAL_LABELS, MEAL_ORDER, nowTime, r1, sumEntries, sumItems, today,
 } from '../lib/nutrition';
-import { addFood, deleteFood, useData } from '../lib/store';
+import { addFood, deleteFood, saveFavorite, useData } from '../lib/store';
 import type { FoodItem, MealType } from '../lib/types';
 
 const emptyItem = { name: '', amount: '', calories: '', protein: '', carbs: '', fat: '' };
@@ -14,6 +16,7 @@ export default function TodayScreen() {
   const [adding, setAdding] = useState(false);
   const [meal, setMeal] = useState<MealType>('snack');
   const [item, setItem] = useState(emptyItem);
+  const [showFavorites, setShowFavorites] = useState(false);
 
   const entries = entriesForDate(data, date);
   const totals = sumEntries(entries);
@@ -58,6 +61,8 @@ export default function TodayScreen() {
         )}
       </section>
 
+      <LifestyleCard date={date} />
+
       {entries.length === 0 && <p className="muted center">עוד לא נרשם אוכל ביום הזה. אפשר לספר בצ׳אט או להוסיף ידנית.</p>}
 
       {MEAL_ORDER.map((m) => {
@@ -78,6 +83,17 @@ export default function TodayScreen() {
                     <span className="muted small">
                       ח {r1(s.protein)} · פ {r1(s.carbs)} · ש {r1(s.fat)}
                     </span>
+                    <button
+                      className="link"
+                      onClick={() => {
+                        const name = prompt('שם למועדף:', e.items.length === 1 ? e.items[0].name : MEAL_LABELS[e.meal]);
+                        if (name?.trim()) saveFavorite(name, e.items, e.meal);
+                      }}
+                      aria-label="שמירה במועדפים"
+                      title="שמירה במועדפים"
+                    >
+                      ☆
+                    </button>
                     <button className="link danger" onClick={() => confirm('למחוק את הרישום?') && deleteFood(e.id)}>מחיקה</button>
                   </div>
                   <ul className="items">
@@ -119,8 +135,12 @@ export default function TodayScreen() {
           </div>
         </form>
       ) : (
-        <button className="btn wide" onClick={() => setAdding(true)}>+ הוספה ידנית</button>
+        <div className="row two">
+          <button className="btn" onClick={() => setShowFavorites(true)}>⭐ מהמועדפים</button>
+          <button className="btn" onClick={() => setAdding(true)}>+ הוספה ידנית</button>
+        </div>
       )}
+      {showFavorites && <FavoritesSheet date={date} onClose={() => setShowFavorites(false)} />}
     </div>
   );
 }

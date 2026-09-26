@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 – 2026-09-27
+
+- **Meal suggestion cards:** the coach answers "what should I eat?" with 1–3 cards. You can log one with one tap, adjust the portion or drop items first, or save it as a favorite. New tool: `suggest_meal`.
+- **Favorite meals:** save from a card, the daily log or chat, then log from the ⭐ sheet or by name in chat (with portion). The coach suggests saving repeated meals. New tools: `save_favorite`, `log_favorite`, `delete_favorite`.
+- **Adaptive targets:** estimates real TDEE from logged intake and the weight trend over 28 days. It recommends updated targets (apply with one tap), detects plateaus, and tells a wrong target apart from eating over target.
+- **Water, steps and sleep:** a daily card in the log (one tap per glass), a steps goal in the profile, and logging from chat with the new `log_daily_metrics` tool. The coach factors these into its advice.
+- One-tap actions leave a note in the chat so the coach stays in sync.
+
 ## 1.0.0 – 2026-09-26
 
 First release.

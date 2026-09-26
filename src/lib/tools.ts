@@ -1,10 +1,13 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import {
-  addFood, addWeighIn, addWorkout, deleteFood, getData, saveProfile, updateFood,
+  addFood, addWeighIn, addWorkout, deleteFavorite, deleteFood, findFavorite, getData, getMetric, markFavoriteUsed,
+  saveFavorite, saveProfile, setMetric, uid, updateFood,
 } from './store';
-import { activeTargets, addDays, entriesForDate, MEAL_LABELS, nowTime, roundTotals, sumEntries, sumItems, today } from './nutrition';
-import type { ActionChip, Profile } from './types';
+import {
+  activeTargets, addDays, entriesForDate, MEAL_LABELS, mealForNow, nowTime, roundTotals, scaleItems, sumEntries, sumItems, today,
+} from './nutrition';
+import type { ActionChip, MealSuggestion, Profile } from './types';
 
 const DateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const num = z.number().finite();
@@ -78,6 +81,34 @@ const schemas = {
     reset_to_computed: z.boolean().optional(),
   }),
   get_history: z.object({ from: DateStr, to: DateStr }),
+  suggest_meal: z.object({
+    title: z.string().min(1),
+    meal: MealSchema,
+    items: z.array(FoodItemSchema).min(1),
+    note: z.string().optional(),
+  }),
+  save_favorite: z
+    .object({
+      name: z.string().min(1),
+      meal: MealSchema.optional(),
+      items: z.array(FoodItemSchema).min(1).optional(),
+      from_entry_id: z.string().optional(),
+    })
+    .refine((v) => v.items || v.from_entry_id, 'items or from_entry_id is required'),
+  log_favorite: z.object({
+    favorite: z.string().min(1),
+    meal: MealSchema.optional(),
+    date: DateStr.optional(),
+    portion: num.min(0.1).max(5).optional(),
+  }),
+  delete_favorite: z.object({ favorite: z.string().min(1) }),
+  log_daily_metrics: z.object({
+    date: DateStr.optional(),
+    water_ml_add: num.optional(),
+    water_ml_total: num.min(0).optional(),
+    steps: num.min(0).optional(),
+    sleep_hours: num.min(0).max(24).optional(),
+  }),
 };
 
 type ToolName = keyof typeof schemas;
@@ -214,12 +245,72 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       required: ['from', 'to'],
     },
   },
+  {
+    name: 'suggest_meal',
+    description:
+      'Show the user a concrete meal suggestion as a card with a one-tap "I ate this" button. Call once per option (up to 3 options) whenever you recommend what to eat. Does NOT log anything.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Short Hebrew name, e.g. "קערת יוגורט חלבון"' },
+        meal: mealJson,
+        items: { type: 'array', items: foodItemJson },
+        note: { type: 'string', description: 'One short line: why it fits (e.g. "משלים 40 ג׳ חלבון")' },
+      },
+      required: ['title', 'meal', 'items'],
+    },
+  },
+  {
+    name: 'save_favorite',
+    description:
+      'Save a meal the user eats often as a favorite (one-tap logging later). Either pass items, or from_entry_id to copy an existing food entry. Saving with an existing name replaces it.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Short Hebrew name the user will recognize, e.g. "הקערה הרגילה"' },
+        meal: mealJson,
+        items: { type: 'array', items: foodItemJson },
+        from_entry_id: { type: 'string' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'log_favorite',
+    description: 'Log a saved favorite meal (by id or exact name from app_state), optionally scaled by portion (e.g. 0.5, 1.5).',
+    input_schema: {
+      type: 'object',
+      properties: { favorite: { type: 'string' }, meal: mealJson, date: dateJson, portion: { type: 'number' } },
+      required: ['favorite'],
+    },
+  },
+  {
+    name: 'delete_favorite',
+    description: 'Remove a saved favorite meal (by id or name).',
+    input_schema: { type: 'object', properties: { favorite: { type: 'string' } }, required: ['favorite'] },
+  },
+  {
+    name: 'log_daily_metrics',
+    description:
+      "Record water, steps or sleep. Use water_ml_add for 'drank 2 glasses' (a glass is about 250 ml), water_ml_total to set the day total. sleep_hours is last night's sleep.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        date: dateJson,
+        water_ml_add: { type: 'number' },
+        water_ml_total: { type: 'number' },
+        steps: { type: 'number' },
+        sleep_hours: { type: 'number' },
+      },
+    },
+  },
 ].map((t) => ({ ...t, eager_input_streaming: true }) as Anthropic.Beta.BetaTool);
 
 export interface ToolOutcome {
   content: string;
   isError: boolean;
   chip?: ActionChip;
+  suggestion?: MealSuggestion;
 }
 
 function dayStatus(date: string) {
@@ -329,7 +420,7 @@ export function runTool(name: string, rawInput: unknown): ToolOutcome {
       const customTargets = i.reset_to_computed
         ? undefined
         : { calories: Math.round(i.calories), protein: Math.round(i.protein), carbs: Math.round(i.carbs), fat: Math.round(i.fat) };
-      saveProfile({ ...p, customTargets, updatedAt: new Date().toISOString() });
+      saveProfile({ ...p, customTargets, targetsSetAt: today(), updatedAt: new Date().toISOString() });
       const t = activeTargets(getData())!;
       return { content: JSON.stringify({ ok: true, targets: t }), isError: false, chip: { ok: true, label: `יעדים: ${t.calories} קק״ל · ${t.protein}ג׳ חלבון` } };
     }
@@ -345,7 +436,72 @@ export function runTool(name: string, rawInput: unknown): ToolOutcome {
         .filter((w) => w.date >= from && w.date <= to)
         .map((w) => ({ date: w.date, type: w.type, min: w.durationMin, kcal: w.caloriesBurned }));
       const weighIns = data.weighIns.filter((w) => w.date >= from && w.date <= to).map((w) => ({ date: w.date, kg: w.weightKg, waist: w.waistCm }));
-      return { content: JSON.stringify({ days, workouts, weighIns }), isError: false };
+      const metrics = data.metrics.filter((m) => m.date >= from && m.date <= to);
+      return { content: JSON.stringify({ days, workouts, weighIns, metrics }), isError: false };
+    }
+    case 'suggest_meal': {
+      const i = input as z.infer<typeof schemas.suggest_meal>;
+      const suggestion: MealSuggestion = { id: uid(), title: i.title, meal: i.meal, items: i.items, note: i.note };
+      return {
+        content: JSON.stringify({ ok: true, shown_as_card: true, totals: roundTotals(sumItems(i.items)), logged: false }),
+        isError: false,
+        suggestion,
+      };
+    }
+    case 'save_favorite': {
+      const i = input as z.infer<typeof schemas.save_favorite>;
+      let items = i.items;
+      let meal = i.meal;
+      if (!items && i.from_entry_id) {
+        const entry = getData().food.find((f) => f.id === i.from_entry_id);
+        if (!entry) return { content: `No food entry with id ${i.from_entry_id}`, isError: true };
+        items = entry.items;
+        meal = meal ?? entry.meal;
+      }
+      const fav = saveFavorite(i.name, items!, meal);
+      return { content: JSON.stringify({ ok: true, id: fav.id }), isError: false, chip: { ok: true, label: `⭐ נשמר במועדפים: ${fav.name}` } };
+    }
+    case 'log_favorite': {
+      const i = input as z.infer<typeof schemas.log_favorite>;
+      const fav = findFavorite(i.favorite);
+      if (!fav) return { content: `No favorite "${i.favorite}". Favorites are listed in app_state.`, isError: true };
+      const date = i.date ?? today();
+      const meal = i.meal ?? fav.meal ?? mealForNow();
+      const entry = addFood({ date, time: date === today() ? nowTime() : '12:00', meal, items: scaleItems(fav.items, i.portion ?? 1) });
+      markFavoriteUsed(fav.id, date);
+      const kcal = Math.round(sumItems(entry.items).calories);
+      return {
+        content: JSON.stringify({ ok: true, id: entry.id, ...dayStatus(date) }),
+        isError: false,
+        chip: { ok: true, label: `נרשם: ⭐ ${fav.name} · ${kcal} קק״ל` },
+      };
+    }
+    case 'delete_favorite': {
+      const { favorite } = input as z.infer<typeof schemas.delete_favorite>;
+      const fav = findFavorite(favorite);
+      if (!fav || !deleteFavorite(fav.id)) return { content: `No favorite "${favorite}"`, isError: true };
+      return { content: JSON.stringify({ ok: true }), isError: false, chip: { ok: true, label: `הוסר מהמועדפים: ${fav.name}` } };
+    }
+    case 'log_daily_metrics': {
+      const i = input as z.infer<typeof schemas.log_daily_metrics>;
+      const date = i.date ?? today();
+      const prev = getMetric(date);
+      const patch: { waterMl?: number; steps?: number; sleepHours?: number } = {};
+      const labels: string[] = [];
+      if (i.water_ml_total !== undefined) patch.waterMl = Math.round(i.water_ml_total);
+      else if (i.water_ml_add !== undefined) patch.waterMl = Math.max(0, Math.round((prev.waterMl ?? 0) + i.water_ml_add));
+      if (patch.waterMl !== undefined) labels.push(`💧 ${patch.waterMl / 1000} ל׳`);
+      if (i.steps !== undefined) {
+        patch.steps = Math.round(i.steps);
+        labels.push(`👣 ${patch.steps.toLocaleString('he-IL')} צעדים`);
+      }
+      if (i.sleep_hours !== undefined) {
+        patch.sleepHours = i.sleep_hours;
+        labels.push(`😴 ${i.sleep_hours} שעות שינה`);
+      }
+      if (!labels.length) return { content: 'Nothing to record: pass water, steps or sleep.', isError: true };
+      const m = setMetric(date, patch);
+      return { content: JSON.stringify({ ok: true, date, metrics: m }), isError: false, chip: { ok: true, label: labels.join(' · ') } };
     }
   }
 }

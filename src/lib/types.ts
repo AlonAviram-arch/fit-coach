@@ -27,6 +27,8 @@ export interface Profile {
   activityLevel: ActivityLevel;
   trainingDaysPerWeek: number;
   trainingTypes: string;
+  /** Daily steps goal (default 8000). */
+  stepsGoal?: number;
   goalType: GoalType;
   targetWeightKg: number;
   targetDate: string; // YYYY-MM-DD
@@ -35,6 +37,8 @@ export interface Profile {
   restrictions: string;
   /** Manual targets override; when absent the computed targets are used. */
   customTargets?: Targets;
+  /** Date (YYYY-MM-DD) the custom targets were last changed. */
+  targetsSetAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -88,6 +92,37 @@ export interface WeighIn {
   note?: string;
 }
 
+/** A meal Claude suggested, shown as a card the user can log with one tap. */
+export interface MealSuggestion {
+  id: string;
+  title: string;
+  meal: MealType;
+  items: FoodItem[];
+  note?: string;
+  /** Set once the user logged it. */
+  loggedEntryId?: string;
+}
+
+/** A saved meal the user eats often, loggable with one tap. */
+export interface FavoriteMeal {
+  id: string;
+  name: string;
+  meal?: MealType;
+  items: FoodItem[];
+  uses: number;
+  lastUsed?: string;
+  createdAt: string;
+}
+
+/** Per-day lifestyle metrics. */
+export interface DailyMetric {
+  date: string;
+  waterMl?: number;
+  steps?: number;
+  /** Sleep of the night before this date. */
+  sleepHours?: number;
+}
+
 /** A logged action shown as a chip under an assistant message. */
 export interface ActionChip {
   label: string;
@@ -101,6 +136,9 @@ export interface ChatMessage {
   /** Number of images attached (images themselves are not persisted). */
   images?: number;
   actions?: ActionChip[];
+  suggestions?: MealSuggestion[];
+  /** 'event' = an app-generated note (e.g. one-tap log), sent to Claude as context. */
+  kind?: 'event';
   error?: boolean;
   ts: string;
 }
@@ -116,6 +154,8 @@ export interface AppData {
   food: FoodEntry[];
   workouts: Workout[];
   weighIns: WeighIn[];
+  favorites: FavoriteMeal[];
+  metrics: DailyMetric[];
   chat: ChatMessage[];
   settings: Settings;
 }

@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from 'react';
-import type { AppData, ChatMessage, FoodEntry, Profile, Settings, WeighIn, Workout } from './types';
+import type {
+  AppData, ChatMessage, DailyMetric, FavoriteMeal, FoodEntry, FoodItem, MealType, Profile, Settings, WeighIn, Workout,
+} from './types';
 
 const STORAGE_KEY = 'fit-coach-data-v1';
 export const DEFAULT_MODEL = 'claude-opus-5';
@@ -11,6 +13,8 @@ function emptyData(): AppData {
     food: [],
     workouts: [],
     weighIns: [],
+    favorites: [],
+    metrics: [],
     chat: [],
     settings: { apiKey: '', model: DEFAULT_MODEL },
   };
@@ -126,6 +130,49 @@ export function deleteWeighIn(id: string): boolean {
   return true;
 }
 
+// ---- Favorites ----
+
+export function findFavorite(idOrName: string): FavoriteMeal | undefined {
+  const key = idOrName.trim();
+  return data.favorites.find((f) => f.id === key) ?? data.favorites.find((f) => f.name.trim() === key);
+}
+
+/** Adds a favorite, or replaces the items of an existing one with the same name. */
+export function saveFavorite(name: string, items: FoodItem[], meal?: MealType): FavoriteMeal {
+  const existing = data.favorites.find((f) => f.name.trim() === name.trim());
+  if (existing) {
+    const updated = { ...existing, items, meal: meal ?? existing.meal };
+    commit({ ...data, favorites: data.favorites.map((f) => (f.id === existing.id ? updated : f)) });
+    return updated;
+  }
+  const fav: FavoriteMeal = { id: uid(), name: name.trim(), meal, items, uses: 0, createdAt: new Date().toISOString() };
+  commit({ ...data, favorites: [...data.favorites, fav] });
+  return fav;
+}
+
+export function markFavoriteUsed(id: string, date: string) {
+  commit({ ...data, favorites: data.favorites.map((f) => (f.id === id ? { ...f, uses: f.uses + 1, lastUsed: date } : f)) });
+}
+
+export function deleteFavorite(id: string): boolean {
+  if (!data.favorites.some((f) => f.id === id)) return false;
+  commit({ ...data, favorites: data.favorites.filter((f) => f.id !== id) });
+  return true;
+}
+
+// ---- Daily metrics (water / steps / sleep) ----
+
+export function getMetric(date: string): DailyMetric {
+  return data.metrics.find((m) => m.date === date) ?? { date };
+}
+
+export function setMetric(date: string, patch: Partial<Omit<DailyMetric, 'date'>>): DailyMetric {
+  const next = { ...getMetric(date), ...patch };
+  const others = data.metrics.filter((m) => m.date !== date);
+  commit({ ...data, metrics: [...others, next].sort(byDate) });
+  return next;
+}
+
 // ---- Chat ----
 
 export function addChatMessage(msg: Omit<ChatMessage, 'id' | 'ts'>): ChatMessage {
@@ -136,6 +183,17 @@ export function addChatMessage(msg: Omit<ChatMessage, 'id' | 'ts'>): ChatMessage
 
 export function updateChatMessage(id: string, patch: Partial<ChatMessage>) {
   commit({ ...data, chat: data.chat.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
+}
+
+export function markSuggestionLogged(messageId: string, suggestionId: string, entryId: string) {
+  commit({
+    ...data,
+    chat: data.chat.map((m) =>
+      m.id === messageId
+        ? { ...m, suggestions: m.suggestions?.map((s) => (s.id === suggestionId ? { ...s, loggedEntryId: entryId } : s)) }
+        : m,
+    ),
+  });
 }
 
 export function clearChat() {

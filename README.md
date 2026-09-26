@@ -6,9 +6,9 @@ You tell the coach what you ate (or send a photo of your plate or a nutrition la
 **Live app:** https://alonaviram-arch.github.io/fit-coach/
 
 <p align="center">
-  <img src="docs/screenshots/3-chat.png" width="220" alt="Chat">
+  <img src="docs/screenshots/8-suggestions.png" width="220" alt="Meal suggestion cards">
   <img src="docs/screenshots/4-today.png" width="220" alt="Daily log">
-  <img src="docs/screenshots/6-weight.png" width="220" alt="Weight">
+  <img src="docs/screenshots/10-adaptive-targets.png" width="220" alt="Adaptive targets">
 </p>
 
 ## Features
@@ -16,9 +16,13 @@ You tell the coach what you ate (or send a photo of your plate or a nutrition la
 | Area | What it does |
 |---|---|
 | **Chat coach (Hebrew)** | A dietitian and fitness-coach persona. It logs meals item by item (calories, protein, carbs, fat), shows running totals against your daily targets, suggests portions that fit what's left, and writes end-of-day and weekly summaries. It speaks to you in feminine or masculine Hebrew based on your profile. |
+| **Meal suggestions** | Ask "מה לאכול עכשיו?" and the coach answers with 1–3 suggestion cards (items, grams, macros) that fit what's left of your day, your preferences and your training. Tap **✓ אכלתי את זה** to log a card, or **התאמה** first to change the portion (½–1½) or drop items. Suggestions are never logged unless you confirm. |
+| **Favorite meals** | Save meals you eat often (from a card, from the daily log, or by asking in chat), then log them with one tap from the ⭐ button, or by name in chat ("הקערה הרגילה", "חצי מהקערה"). The coach offers to save a meal the third time you log it, and prefers your favorites when suggesting. |
 | **Photos** | Photograph a meal, a restaurant plate or a nutrition label. Claude reads it and logs the values. |
 | **Profile and goals** | Height, weight, age, sex, optional circumferences (waist, hips, chest, arm, thigh) and body-fat %. Goal type (lose, maintain or gain), target weight and date, fitness goals, food preferences and restrictions. |
 | **Daily targets** | Worked out automatically (Mifflin-St Jeor BMR × activity, with a deficit or surplus sized to your goal date and kept within safe limits). You can override them manually, or agree on new ones with the coach in chat. |
+| **Adaptive targets** | After about 3 weeks of logging and weigh-ins, the app estimates your *real* energy expenditure from what you ate and how your weight actually moved. If it differs from the formula, or your weight has stalled, it recommends new targets (one tap to apply). If the stall comes from eating above target, it says so instead of lowering the target. |
+| **Water, steps, sleep** | Tap once per glass of water (goal ≈ 35 ml/kg), enter steps (goal set in profile) and last night's sleep, or just tell the coach. The coach takes them into account, e.g. after a short night it suggests a protein-rich breakfast. |
 | **Daily log** | Meals grouped by type, macro progress bars, a day-by-day browser, delete, and manual add. |
 | **Workouts** | Log type, duration, intensity, calories burned, and exercises (sets × reps × kg). Shows a weekly count against your training-days goal. The coach can also log workouts straight from chat. |
 | **Weekly weigh-ins** | Weight plus optional measurements, a trend chart with a goal line, progress toward the goal, average weekly change, and a reminder when a weigh-in is due. |
