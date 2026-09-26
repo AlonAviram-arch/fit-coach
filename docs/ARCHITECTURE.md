@@ -1,6 +1,15 @@
 # Architecture
 
-Fit Coach is a static single-page app with no backend. The phone's browser runs the UI, stores all the data, and calls the Claude API directly.
+Fit Coach is a static single-page app with no backend of its own. One build runs in two places:
+
+| | Standalone PWA (GitHub Pages) | claude.ai artifact |
+|---|---|---|
+| Detected by | no `window.claude` | `window.claude.use` exists (set by the claude.ai viewer before page scripts run) |
+| Claude | `@anthropic-ai/sdk` with the user's API key (`claude.ts`) | the viewer's `sample` capability, billed to the viewer's Claude plan (`subscription.ts`) |
+| Storage | `localStorage` only | the artifact `db`, in the viewer's private subtree, plus `localStorage` as a cache (`cloud.ts`) |
+| Dialogs, downloads | native | the viewer blocks `confirm`/`prompt`/`alert` and download links, so the app uses in-app dialogs (`dialog.ts`) and hides export there |
+
+The standalone PWA works like this:
 
 ```
 ┌──────────────── phone browser (PWA) ────────────────┐
@@ -24,6 +33,13 @@ Fit Coach is a static single-page app with no backend. The phone's browser runs 
 | `src/lib/tools.ts` | Tool definitions sent to Claude, zod validation, and the executors that write to the store |
 | `src/lib/claude.ts` | SDK client, history windowing, the streaming tool-use loop, and error messages |
 | `src/lib/models.ts` | The model picker list |
+| `src/lib/runtime.ts` | Detects the claude.ai viewer and types the capabilities used (`sample`, `db`, `user`) |
+| `src/lib/backend.ts` | `useBackend()`: `subscription`, `api`, `none` or `checking` |
+| `src/lib/subscription.ts` | The coach loop on the Claude subscription, through `sample` with page tools |
+| `src/lib/cloud.ts` | Loads and syncs data with the artifact database |
+| `src/lib/coachShared.ts` | Types and history helpers shared by both backends |
+| `src/lib/dialog.ts`, `src/components/DialogHost.tsx` | In-app confirm, prompt and notice |
+| `scripts/artifact-page.mjs` | Builds `dist/artifact.html` (content only; claude.ai adds the document skeleton) and the file map to publish |
 | `src/lib/quicklog.ts` | One-tap logging from the UI (suggestion cards, favorites). Each one writes the entry and adds an `event` note to the chat, so Claude sees it in the history. |
 | `src/components/SuggestionCard.tsx` | A meal card with portion scaling, item toggles, log and save-as-favorite |
 | `src/components/FavoritesSheet.tsx` | Bottom sheet for logging or managing favorites |
@@ -94,6 +110,35 @@ After a mid-output fallback, blocks that come before the last `fallback` marker 
 `suggest_meal` returns the card to the loop, which attaches it to the assistant message (`onSuggestion`). The card is rendered by `SuggestionCard`. Logging a card, or a favorite, goes through `quickLog`, which adds the food entry and an event note such as `[נרשם בלחיצה: ארוחת ערב – … · 165 קק״ל]`.
 Past cards are replayed to Claude as a text note (`[כרטיסי הצעה שהוצגו: …]`) on the assistant turn. Whether a card was logged is *not* written into that turn, because that would change an earlier message and break the cache; the event note and `<app_state>` carry that instead.
 
+## Subscription backend (claude.ai)
+
+`sendViaSubscription` calls `sample(turns, {tools, onText, modelTier, images})`:
+
+- **No system prompt:** `sample` has none, so `SYSTEM_PROMPT` plus a short framing note goes in a leading user turn. It's followed by as much recent history as fits (the input cap is 64 KiB; the app stays under about 58 KB) and the new message with `<app_state>`.
+- **Tools:** the same 13 tools are passed as page functions (`execute` runs `runTool`). Failures throw, so Claude sees `Error: …`. If the viewer allows fewer tools, they're chosen by priority (logging first). Calls with tools are never cached.
+- **Streaming and cost:** `onText` streams the whole answer so far. Every tool round is a separate request on the user's plan. Claude's model tier comes from the profile setting.
+- **Errors:** `rate_limited` (plan limit), `not_granted` (the user declined), and the other codes map to Hebrew messages. Text that already streamed is kept.
+
+## Cloud storage (claude.ai)
+
+`initCloudSync` runs before the first render inside claude.ai, waiting at most 8 s:
+
+```
+data/users/<viewer id>/core              profile, settings (model/tier, never the API key), favorites, workouts, weigh-ins
+data/users/<viewer id>/core/months/<ym>  food entries + daily metrics for one month
+data/users/<viewer id>/core/chat/recent  newest chat messages (under 180 KB)
+```
+
+`data/users/<id>/` is private to that viewer on the platform side; nobody else can read it, the artifact owner included. On load, the remote data replaces the local cache, or local data is uploaded the first time. Every store change schedules a debounced flush that writes only the documents whose JSON changed, one write at a time, and a pending write is flushed when the page is hidden. There's no live multi-device merge: the last write wins, and other devices pick up changes the next time they open the app.
+
+## Publishing the claude.ai artifact
+
+```bash
+npm run build:artifact
+```
+
+Then publish `dist/artifact.html` with the Artifact tool (Claude Code). Pass every file in `dist/artifact-files.json` as `files` and declare `capabilities: {sample: {}, db: {}, user: {}}`. Republish to the same artifact URL to update it; stored data survives republishes. The build step also escapes a literal U+FFFD in the bundle, which the artifact host rejects.
+
 ## Target calculation (`computeTargets`)
 
 - **BMR** (Mifflin-St Jeor): `10·kg + 6.25·cm − 5·age + (5 for men, −161 for women)`
@@ -116,7 +161,8 @@ Energy balance from real data over the last 28 days (excluding today):
 
 ## Security and privacy
 
-- The API key is stored in `localStorage` and is left out of backup exports.
+- The API key is stored in `localStorage`, left out of backup exports, and never written to the cloud.
+- In claude.ai, the page never sees any credential: `sample` runs on the viewer's session.
 - Claude's markdown is sanitized with DOMPurify before it's rendered.
 - No analytics and no backend. Google Fonts (Heebo) is the only third-party request apart from the Anthropic API.
 - Tool input from the model is treated as untrusted and validated before it's written.

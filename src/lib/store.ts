@@ -43,6 +43,11 @@ function commit(next: AppData) {
   listeners.forEach((l) => l());
 }
 
+/** Replaces all data (used when loading from the cloud). */
+export function hydrate(next: AppData) {
+  commit(next);
+}
+
 export function getData(): AppData {
   return data;
 }

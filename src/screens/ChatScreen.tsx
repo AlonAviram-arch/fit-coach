@@ -3,11 +3,14 @@ import type { Tab } from '../App';
 import FavoritesSheet from '../components/FavoritesSheet';
 import MacroBars from '../components/MacroBars';
 import SuggestionCard from '../components/SuggestionCard';
-import type { ImageInput } from '../lib/claude';
+import { useBackend } from '../lib/backend';
+import type { ImageInput } from '../lib/coachShared';
+import { sendViaSubscription, subscriptionErrorText } from '../lib/subscription';
 import { fileToImage, renderMarkdown } from '../lib/media';
 import { activeTargets, entriesForDate, sumEntries, today } from '../lib/nutrition';
 import { addChatMessage, clearChat, getData, updateChatMessage, useData } from '../lib/store';
 import type { ActionChip, MealSuggestion } from '../lib/types';
+import { confirmThen } from '../lib/dialog';
 
 const QUICK_PROMPTS = ['מה לאכול עכשיו?', 'מה נשאר לי להיום?', 'סיימתי להיום', 'סיכום שבועי'];
 
@@ -19,6 +22,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
   const [images, setImages] = useState<PendingImage[]>([]);
   const [busy, setBusy] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const backend = useBackend(data.settings.apiKey);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -49,21 +53,35 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
     const actions: ActionChip[] = [];
     const suggestions: MealSuggestion[] = [];
 
+    const callbacks = {
+      onText: (t: string) => updateChatMessage(reply.id, { text: t }),
+      onAction: (chip: ActionChip) => {
+        actions.push(chip);
+        updateChatMessage(reply.id, { actions: [...actions] });
+      },
+      onSuggestion: (s: MealSuggestion) => {
+        suggestions.push(s);
+        updateChatMessage(reply.id, { suggestions: [...suggestions] });
+      },
+    };
+
+    if (backend === 'subscription') {
+      try {
+        const finalText = await sendViaSubscription(trimmed, sentImages, prior, callbacks);
+        updateChatMessage(reply.id, { text: finalText || (suggestions.length ? '' : actions.length ? 'רשמתי ✔️' : '') });
+      } catch (err) {
+        updateChatMessage(reply.id, { text: subscriptionErrorText(err), error: true });
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     // The SDK is loaded on first send to keep the initial bundle small.
     const claude = import('../lib/claude');
     try {
       const { sendToCoach } = await claude;
-      const finalText = await sendToCoach(trimmed, sentImages, prior, {
-        onText: (t) => updateChatMessage(reply.id, { text: t }),
-        onAction: (chip) => {
-          actions.push(chip);
-          updateChatMessage(reply.id, { actions: [...actions] });
-        },
-        onSuggestion: (s) => {
-          suggestions.push(s);
-          updateChatMessage(reply.id, { suggestions: [...suggestions] });
-        },
-      });
+      const finalText = await sendToCoach(trimmed, sentImages, prior, callbacks);
       const fallback = suggestions.length ? '' : actions.length ? 'רשמתי ✔️' : '';
       updateChatMessage(reply.id, { text: finalText || fallback });
     } catch (err) {
@@ -74,7 +92,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
     }
   }
 
-  const missingKey = !data.settings.apiKey;
+  const missingKey = backend === 'none' || backend === 'checking';
   const missingProfile = !data.profile;
 
   return (
@@ -83,7 +101,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
         <div className="chat-title">
           <h1>המאמנת 🥗</h1>
           {data.chat.length > 0 && (
-            <button className="link" onClick={() => confirm('למחוק את היסטוריית הצ׳אט? (היומן נשמר)') && clearChat()}>
+            <button className="link" onClick={() => confirmThen('לנקות את השיחה? היומן, האימונים והמשקל נשארים.', clearChat, 'ניקוי')}>
               ניקוי שיחה
             </button>
           )}
@@ -94,7 +112,11 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
       <div className="messages" ref={listRef}>
         {(missingKey || missingProfile) && (
           <div className="banner">
-            {missingProfile ? 'כדי שאוכל לחשב יעדים, מלאו קודם את הפרופיל.' : 'חסר מפתח API של Claude.'}{' '}
+            {missingProfile
+              ? 'כדי שאוכל לחשב יעדים, מלאו קודם את הפרופיל.'
+              : backend === 'checking'
+                ? 'מתחבר ל-Claude…'
+                : 'אין חיבור ל-Claude. אפשר לפתוח את האפליקציה דרך claude.ai (עם המנוי שלך) או להזין מפתח API.'}{' '}
             <button className="link" onClick={() => goTo('profile')}>למסך הפרופיל ←</button>
           </div>
         )}

@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useBackend } from '../lib/backend';
 import { MODELS } from '../lib/models';
 import { ACTIVITY_LABELS, adaptiveEstimate, addDays, computeTargets, currentWeight, today } from '../lib/nutrition';
 import {
   addWeighIn, exportJson, getData, importJson, resetAll, saveProfile, saveSettings, useData,
 } from '../lib/store';
 import type { ActivityLevel, GoalType, Profile, Sex, Targets } from '../lib/types';
+import { ask, confirmThen } from '../lib/dialog';
+import { inClaudeViewer } from '../lib/runtime';
 
 type Form = Record<string, string>;
 
@@ -42,6 +45,7 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
   const [custom, setCustom] = useState<Targets | null>(data.profile?.customTargets ?? null);
   const [apiKey, setApiKey] = useState(data.settings.apiKey);
   const [saved, setSaved] = useState(false);
+  const backend = useBackend(data.settings.apiKey);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm({ ...form, [k]: e.target.value });
@@ -106,7 +110,7 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
     saveSettings({ apiKey: apiKey.trim() });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-    if (isNew && apiKey.trim()) onDone();
+    if (isNew && (apiKey.trim() || backend === 'subscription')) onDone();
   }
 
   function download() {
@@ -123,9 +127,9 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
     try {
       importJson(await file.text());
       setForm(toForm(getData().profile, currentWeight(getData())));
-      alert('הגיבוי שוחזר בהצלחה');
+      ask.notice('הגיבוי שוחזר בהצלחה.');
     } catch (err) {
-      alert('שחזור נכשל: ' + (err instanceof Error ? err.message : err));
+      ask.notice('השחזור נכשל: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -271,6 +275,26 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
 
         <section className="card form">
           <h3 className="card-title">חיבור ל-Claude</h3>
+          {backend === 'subscription' ? (
+            <>
+              <p className="connected">✓ מחובר דרך חשבון Claude שלך. השימוש נספר במנוי (למשל Pro), בלי מפתח API ובלי תשלום נוסף.</p>
+              <label>רמת מודל
+                <select value={data.settings.tier ?? 'default'} onChange={(e) => saveSettings({ tier: e.target.value as 'default' | 'complex' | 'quick' })}>
+                  <option value="default">רגיל (מומלץ)</option>
+                  <option value="complex">מתקדם (מדויק יותר, איטי יותר, צורך יותר מהמכסה)</option>
+                  <option value="quick">מהיר (תשובות מיידיות, פחות מעמיק)</option>
+                </select>
+              </label>
+              <p className="muted small">הנתונים נשמרים בחשבון ה-Claude שלך ומסתנכרנים בין מכשירים. רק את/ה יכול/ה לראות אותם.</p>
+            </>
+          ) : backend === 'checking' ? (
+            <p className="muted">מתחבר ל-Claude…</p>
+          ) : (
+          <>
+          <p className="muted small">
+            יש לך מנוי Claude Pro? אפשר לפתוח את האפליקציה דרך הקישור שלה ב-claude.ai, ואז היא עובדת עם המנוי בלי מפתח API.
+            כאן, מחוץ ל-claude.ai, צריך מפתח API.
+          </p>
           <label>מפתח API
             <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-…" autoComplete="off" dir="ltr" />
           </label>
@@ -283,6 +307,8 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
               {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label} — {m.note}</option>)}
             </select>
           </label>
+          </>
+          )}
         </section>
 
         <button type="submit" className="btn primary wide sticky-save" disabled={!preview}>
@@ -292,12 +318,16 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
 
       <section className="card form">
         <h3 className="card-title">גיבוי ונתונים</h3>
-        <p className="muted small">כל הנתונים נשמרים רק בדפדפן במכשיר הזה. מומלץ לגבות מדי פעם.</p>
+        <p className="muted small">
+          {inClaudeViewer
+            ? 'הנתונים נשמרים בחשבון ה-Claude שלך ומסתנכרנים אוטומטית. אפשר לייבא לכאן גיבוי מהגרסה שעובדת עם מפתח API.'
+            : 'כל הנתונים נשמרים רק בדפדפן במכשיר הזה. מומלץ לגבות מדי פעם.'}
+        </p>
         <div className="row">
-          <button className="btn" onClick={download}>ייצוא גיבוי</button>
+          {!inClaudeViewer && <button className="btn" onClick={download}>ייצוא גיבוי</button>}
           <label className="btn">ייבוא גיבוי<input type="file" accept="application/json" hidden onChange={(e) => upload(e.target.files?.[0])} /></label>
         </div>
-        <button className="link danger" onClick={() => confirm('למחוק את כל הנתונים? אי אפשר לבטל.') && resetAll()}>מחיקת כל הנתונים</button>
+        <button className="link danger" onClick={() => confirmThen('למחוק את כל הנתונים? אי אפשר לבטל את זה.', resetAll, 'מחיקת הכול')}>מחיקת כל הנתונים</button>
       </section>
     </div>
   );

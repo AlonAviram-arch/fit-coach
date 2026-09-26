@@ -1,9 +1,9 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// Served from https://<user>.github.io/fit-coach/ on GitHub Pages
-// (dev and preview use the same base path).
+// Relative base: the same build runs on GitHub Pages and as a claude.ai artifact
+// (where files are served next to the page).
 export default defineConfig({
-  base: '/fit-coach/',
+  base: './',
   plugins: [react()],
 })

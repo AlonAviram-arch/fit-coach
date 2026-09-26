@@ -3,6 +3,7 @@ import WeightChart from '../components/WeightChart';
 import { adaptiveEstimate, daysBetween, formatDate, r1, today } from '../lib/nutrition';
 import { addWeighIn, deleteWeighIn, useData } from '../lib/store';
 import type { WeighIn } from '../lib/types';
+import { confirmThen } from '../lib/dialog';
 
 const MEASURES: { key: keyof WeighIn; label: string }[] = [
   { key: 'waistCm', label: 'מותניים (ס״מ)' },
@@ -135,7 +136,7 @@ export default function WeightScreen() {
                     <td className="num">{w.weightKg}</td>
                     <td className={diff !== null ? (diff <= 0 ? 'good' : 'bad') : ''}>{diff === null ? '—' : `${diff > 0 ? '+' : ''}${diff}`}</td>
                     <td>{w.waistCm ?? '—'}</td>
-                    <td><button className="link danger" onClick={() => confirm('למחוק את השקילה?') && deleteWeighIn(w.id)} aria-label="מחיקה">×</button></td>
+                    <td><button className="link danger" onClick={() => confirmThen('למחוק את השקילה?', () => deleteWeighIn(w.id))} aria-label="מחיקה">×</button></td>
                   </tr>
                 );
               })}

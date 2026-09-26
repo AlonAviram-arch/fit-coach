@@ -3,6 +3,7 @@ import { MEAL_LABELS, MEAL_ORDER, mealForNow, r1, sumItems, today } from '../lib
 import { logFavorite } from '../lib/quicklog';
 import { deleteFavorite, useData } from '../lib/store';
 import type { MealType } from '../lib/types';
+import { confirmThen } from '../lib/dialog';
 
 /** Bottom sheet listing saved meals; tap one to log it. */
 export default function FavoritesSheet({ onClose, date = today() }: { onClose: () => void; date?: string }) {
@@ -59,7 +60,7 @@ export default function FavoritesSheet({ onClose, date = today() }: { onClose: (
                       </span>
                     </button>
                     {managing && (
-                      <button className="link danger" onClick={() => confirm(`למחוק את „${f.name}”?`) && deleteFavorite(f.id)}>
+                      <button className="link danger" onClick={() => confirmThen(`למחוק את „${f.name}” מהמועדפים?`, () => deleteFavorite(f.id))}>
                         מחיקה
                       </button>
                     )}

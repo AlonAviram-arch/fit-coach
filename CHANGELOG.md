@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 – 2026-09-27
+
+- **Runs on your Claude subscription:** published as a claude.ai artifact (https://claude.ai/artifact/2Nd8HvkAwi7R9g3jxNQ3Gw). Inside claude.ai the coach reaches Claude through the viewer's `sample` capability, on the user's own Pro/Max plan, with no API key. All tools work as page functions, with a model tier setting.
+- **Cloud sync in claude.ai:** data is kept in the artifact database under the user's private subtree, split into core, monthly and chat documents, and restored on any device.
+- **In-app dialogs** replace `confirm`/`prompt`/`alert`, which the claude.ai viewer blocks. Backup export is hidden there because the data is synced.
+- The build uses relative paths so one bundle serves both GitHub Pages and claude.ai. `npm run build:artifact` produces the artifact page.
+- Fix: saving a new profile without an API key now opens the chat in subscription mode.
+
 ## 1.1.0 – 2026-09-27
 
 - **Meal suggestion cards:** the coach answers "what should I eat?" with 1–3 cards. You can log one with one tap, adjust the portion or drop items first, or save it as a favorite. New tool: `suggest_meal`.

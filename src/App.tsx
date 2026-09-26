@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import DialogHost from './components/DialogHost';
+import { inClaudeViewer } from './lib/runtime';
 import { useData } from './lib/store';
 import ChatScreen from './screens/ChatScreen';
 import TodayScreen from './screens/TodayScreen';
@@ -18,7 +20,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 export default function App() {
   const data = useData();
-  const needsSetup = !data.profile || !data.settings.apiKey;
+  const needsSetup = !data.profile || (!data.settings.apiKey && !inClaudeViewer);
   const [tab, setTab] = useState<Tab>(needsSetup ? 'profile' : 'chat');
 
   return (
@@ -43,6 +45,7 @@ export default function App() {
           </button>
         ))}
       </nav>
+      <DialogHost />
     </div>
   );
 }

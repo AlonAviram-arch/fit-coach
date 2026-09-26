@@ -7,6 +7,7 @@ import {
 } from '../lib/nutrition';
 import { addFood, deleteFood, saveFavorite, useData } from '../lib/store';
 import type { FoodItem, MealType } from '../lib/types';
+import { ask, confirmThen } from '../lib/dialog';
 
 const emptyItem = { name: '', amount: '', calories: '', protein: '', carbs: '', fat: '' };
 
@@ -85,8 +86,8 @@ export default function TodayScreen() {
                     </span>
                     <button
                       className="link"
-                      onClick={() => {
-                        const name = prompt('שם למועדף:', e.items.length === 1 ? e.items[0].name : MEAL_LABELS[e.meal]);
+                      onClick={async () => {
+                        const name = await ask.prompt('שם למועדף:', e.items.length === 1 ? e.items[0].name : MEAL_LABELS[e.meal]);
                         if (name?.trim()) saveFavorite(name, e.items, e.meal);
                       }}
                       aria-label="שמירה במועדפים"
@@ -94,7 +95,7 @@ export default function TodayScreen() {
                     >
                       ☆
                     </button>
-                    <button className="link danger" onClick={() => confirm('למחוק את הרישום?') && deleteFood(e.id)}>מחיקה</button>
+                    <button className="link danger" onClick={() => confirmThen('למחוק את הרישום?', () => deleteFood(e.id))}>מחיקה</button>
                   </div>
                   <ul className="items">
                     {e.items.map((i, idx) => (

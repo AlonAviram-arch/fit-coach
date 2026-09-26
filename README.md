@@ -3,7 +3,14 @@
 A Hebrew, chat-first mobile app for tracking diet and training every day, powered by Claude.
 You tell the coach what you ate (or send a photo of your plate or a nutrition label), what workout you did, or what you weighed. Claude logs it, works out calories and macros, and keeps you on track toward your weight and fitness goals.
 
-**Live app:** https://alonaviram-arch.github.io/fit-coach/
+**Two ways to run it** (same app, same code):
+
+| | Opens at | Claude access | Your data |
+|---|---|---|---|
+| **In claude.ai** *(recommended with a Claude Pro/Max plan)* | https://claude.ai/artifact/2Nd8HvkAwi7R9g3jxNQ3Gw | Your Claude subscription. No API key and no extra cost; usage counts toward your plan's limits. | Synced to your private space in the artifact's database, on every device you sign in on |
+| **Standalone PWA** | https://alonaviram-arch.github.io/fit-coach/ | Your own Claude API key (pay per use) | Only in that phone's browser (with JSON backup) |
+
+The claude.ai link is private to its owner. To use it from another account, publish your own copy (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#publishing-the-claudeai-artifact)).
 
 <p align="center">
   <img src="docs/screenshots/8-suggestions.png" width="220" alt="Meal suggestion cards">
@@ -29,9 +36,20 @@ You tell the coach what you ate (or send a photo of your plate or a nutrition la
 | **Installable PWA** | Add it to your home screen on iPhone or Android. The app shell works offline. |
 | **Private by design** | All data stays in your phone's browser. Nothing is stored on a server. You can export and import a JSON backup. |
 
-## Claude connection: API key vs. your claude.ai account
+## Claude connection
 
-The app talks to Claude through the **Claude API**. A claude.ai subscription (Pro or Max) **can't** be used by third-party apps, so you need an API key:
+### With your Claude subscription (claude.ai)
+
+Open the app from its claude.ai link. Inside claude.ai the app reaches Claude through the artifact runtime's `sample` capability, which runs on **the signed-in viewer's own Claude plan**. The first message asks you to allow it. After that:
+
+- There's no API key and no separate bill. Usage counts toward your plan's normal limits, and heavy use can hit them.
+- The model tier is set in the profile screen: רגיל (default), מתקדם (most capable), or מהיר (fastest).
+- Photos work wherever the viewer supports sending images.
+- Your log is saved in your private `data/users/<you>/` space. Nobody else can read it, including other people the artifact is shared with.
+
+### With an API key (standalone PWA)
+
+Outside claude.ai, a claude.ai subscription can't be used by apps, so the PWA needs an API key:
 
 1. Sign in at [console.anthropic.com](https://console.anthropic.com) with the same email you use for Claude.
 2. Add credit under **Billing** (usage is pay-as-you-go and separate from a claude.ai subscription).
@@ -51,7 +69,11 @@ A typical day of logging is roughly 10–20 messages. The stable system prompt i
 
 ## Install on your phone
 
-1. Open the live app link on your phone.
+**claude.ai version:** open the claude.ai link in your phone's browser while signed in to Claude, then add it to your home screen from the browser menu.
+
+**Standalone PWA:**
+
+1. Open the GitHub Pages link on your phone.
 2. **iPhone (Safari):** tap Share → *Add to Home Screen*. **Android (Chrome):** tap ⋮ → *Install app*.
 3. Fill in your profile, paste your API key, and start chatting.
 
@@ -64,6 +86,7 @@ npm install
 npm run dev      # http://localhost:5173/fit-coach/
 npm run build    # type-check + production build to dist/
 npm run lint
+npm run build:artifact   # build + dist/artifact.html for publishing to claude.ai
 ```
 
 Stack: React 19 + TypeScript + Vite, `@anthropic-ai/sdk` (browser mode), `zod` for validating tool input, and `marked` + `DOMPurify` for rendering Claude's markdown.

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { addDays, formatDate, today } from '../lib/nutrition';
 import { addWorkout, deleteWorkout, useData } from '../lib/store';
 import type { Exercise, Workout } from '../lib/types';
+import { confirmThen } from '../lib/dialog';
 
 const TYPES = ['קרוספיט', 'כוח / חדר כושר', 'ריצה', 'הליכה מהירה', 'אופניים', 'שחייה', 'יוגה / פילאטיס', 'ריקוד', 'HIIT'];
 const INTENSITY: Record<NonNullable<Workout['intensity']>, string> = { low: 'קלה', medium: 'בינונית', high: 'גבוהה' };
@@ -125,7 +126,7 @@ export default function WorkoutsScreen() {
                 <span className="muted small">
                   {formatDate(w.date)} · {w.durationMin} דק׳{w.intensity ? ` · ${INTENSITY[w.intensity]}` : ''}{w.caloriesBurned ? ` · ~${w.caloriesBurned} קק״ל` : ''}
                 </span>
-                <button className="link danger" onClick={() => confirm('למחוק את האימון?') && deleteWorkout(w.id)}>מחיקה</button>
+                <button className="link danger" onClick={() => confirmThen('למחוק את האימון?', () => deleteWorkout(w.id))}>מחיקה</button>
               </div>
               {w.exercises?.length ? (
                 <ul className="items">

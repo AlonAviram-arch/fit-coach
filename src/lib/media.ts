@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
-import type { ImageInput } from './claude';
+import type { ImageInput } from './coachShared';
 
 const MAX_EDGE = 1568; // Claude's recommended max image edge
 

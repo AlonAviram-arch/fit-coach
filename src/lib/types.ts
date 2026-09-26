@@ -146,6 +146,8 @@ export interface ChatMessage {
 export interface Settings {
   apiKey: string;
   model: string;
+  /** Model tier when running inside claude.ai on the user's subscription. */
+  tier?: 'default' | 'complex' | 'quick';
 }
 
 export interface AppData {

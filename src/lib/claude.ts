@@ -2,28 +2,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import { buildAppState, SYSTEM_PROMPT } from './prompt';
 import { getData } from './store';
 import { runTool, TOOLS } from './tools';
-import { roundTotals, sumItems } from './nutrition';
-import type { ActionChip, ChatMessage, MealSuggestion } from './types';
+import { assistantReplayText, imagesNote, type ImageInput, type SendCallbacks, usableHistory } from './coachShared';
+import type { ChatMessage } from './types';
 
 type MessageParam = Anthropic.Beta.BetaMessageParam;
 type ContentBlockParam = Anthropic.Beta.BetaContentBlockParam;
 
-export interface ImageInput {
-  mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
-  base64: string;
-}
-
-export interface SendCallbacks {
-  onText: (fullText: string) => void;
-  onAction: (chip: ActionChip) => void;
-  onSuggestion: (suggestion: MealSuggestion) => void;
-}
-
 const MAX_TOOL_ROUNDS = 8;
-
-function imagesNote(count: number): string {
-  return `[צורפו ${count} תמונות]`;
-}
 
 /**
  * Past chat as API messages. Tool calls are not replayed: their effects are
@@ -31,17 +16,8 @@ function imagesNote(count: number): string {
  * The window moves in steps of 30 messages so the cached prefix stays stable
  * between steps.
  */
-/** Text stand-in for suggestion cards, so later turns know what was offered. */
-function suggestionsNote(suggestions: MealSuggestion[]): string {
-  const list = suggestions.map((s) => {
-    const t = roundTotals(sumItems(s.items));
-    return `${s.title} (${t.calories} קק״ל, ${t.protein} ג׳ חלבון)`;
-  });
-  return `[כרטיסי הצעה שהוצגו: ${list.join('; ')}]`;
-}
-
 function historyMessages(chat: ChatMessage[]): MessageParam[] {
-  const usable = chat.filter((m) => !m.error && (m.text.trim() || m.suggestions?.length));
+  const usable = usableHistory(chat);
   const start = Math.max(0, Math.floor((usable.length - 30) / 30) * 30);
   const msgs: MessageParam[] = [];
   for (const m of usable.slice(start)) {
@@ -50,10 +26,7 @@ function historyMessages(chat: ChatMessage[]): MessageParam[] {
       if (m.images) content.push({ type: 'text', text: imagesNote(m.images) });
       msgs.push({ role: 'user', content });
     } else {
-      const text = m.suggestions?.length ? `${m.text}
-
-${suggestionsNote(m.suggestions)}`.trim() : m.text;
-      msgs.push({ role: 'assistant', content: text });
+      msgs.push({ role: 'assistant', content: assistantReplayText(m) });
     }
   }
   while (msgs.length && msgs[0].role !== 'user') msgs.shift();
