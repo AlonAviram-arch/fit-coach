@@ -136,10 +136,11 @@ export function buildAppState(data: AppData): string {
 
   if (data.favorites.length) {
     lines.push('\nfavorites:');
-    for (const f of [...data.favorites].sort((a, b) => b.uses - a.uses).slice(0, 15)) {
+    // Compact on purpose: log_favorite takes the id, so amounts aren't needed here.
+    for (const f of [...data.favorites].sort((a, b) => b.uses - a.uses).slice(0, 10)) {
       const t = roundTotals(sumItems(f.items));
       lines.push(
-        `- id=${f.id} "${f.name}"${f.meal ? ` (${MEAL_LABELS[f.meal]})` : ''}: ${f.items.map((i) => `${i.name} ${i.amount}`).join(', ')} → ${t.calories}kcal P${t.protein}; used ${f.uses}x`,
+        `- id=${f.id} "${f.name}"${f.meal ? ` (${MEAL_LABELS[f.meal]})` : ''}: ${f.items.map((i) => i.name).join(', ')} → ${t.calories}kcal P${t.protein}; used ${f.uses}x`,
       );
     }
   }
