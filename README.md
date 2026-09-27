@@ -76,7 +76,7 @@ The key is stored only on your device and is sent only to `api.anthropic.com`.
 | Claude Sonnet 5 | A good balance of quality and cost | $2 / $10 |
 | Claude Haiku 4.5 | Cheapest and fastest | $1 / $5 |
 
-A typical day of logging is roughly 10–20 messages. The stable system prompt is cached to keep costs down.
+A typical day of logging is roughly 10–20 messages. The app keeps token use low: the stable prefix is cached, the tool-loop tail is cached, it replays only recent chat (the day's data is sent as compact structured state), and photos are downscaled. The profile screen shows your usage, the estimated cost and the cache hit rate, and has a thinking-depth setting (low/medium/high) if you want to trade depth for cost. Details are in [docs/COST_OPTIMIZATION.md](docs/COST_OPTIMIZATION.md).
 
 ## Install on your phone
 
@@ -107,6 +107,7 @@ Every push to `main` deploys to GitHub Pages through [.github/workflows/deploy.y
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): data model, the Claude tool loop, prompt and caching design, and how targets are calculated
+- [docs/COST_OPTIMIZATION.md](docs/COST_OPTIMIZATION.md): Claude token-cost review, profile and changes
 - [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md): how the original Gemini dietitian conversation maps to app features
 - [docs/USER_GUIDE.he.md](docs/USER_GUIDE.he.md): user guide (Hebrew)
 - [CHANGELOG.md](CHANGELOG.md)

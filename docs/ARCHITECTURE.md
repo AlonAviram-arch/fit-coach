@@ -62,8 +62,8 @@ The first time the profile is saved, the profile weight and measurements become 
 - **SDK:** `@anthropic-ai/sdk` with `dangerouslyAllowBrowser: true`. The user's key lives on their own device; there is no shared secret to leak. The SDK is loaded lazily on the first message.
 - **Endpoint:** `client.beta.messages.stream(...)`, with streaming so text appears as it's generated.
 - **Model settings** (`requestOptions` in `claude.ts`):
-  - `claude-opus-5` (default): adaptive thinking (on by default), `effort: medium`, plus the server-side refusal fallback (`fallbacks: "default"` with beta `server-side-fallback-2026-07-01`).
-  - `claude-sonnet-5`: `thinking: {type: "adaptive"}` and `effort: medium`.
+  - `claude-opus-5` (default): adaptive thinking (on by default), `effort` from the user's setting (medium by default), plus the server-side refusal fallback (`fallbacks: "default"` with beta `server-side-fallback-2026-07-01`).
+  - `claude-sonnet-5`: `thinking: {type: "adaptive"}` and `effort` from the setting.
   - `claude-haiku-4-5`: no thinking or effort parameters.
 - `max_tokens: 32000`.
 
@@ -72,10 +72,10 @@ The first time the profile is saved, the profile weight and measurements become 
 The system prompt (`SYSTEM_PROMPT`) never changes, so it is cached along with the tool definitions (breakpoint 1).
 Anything that changes — today's log with entry ids, targets, the last 7 days, and weigh-ins — goes into an `<app_state>` text block **appended to the latest user turn only**. It is never stored in history.
 
-The current turn is laid out as `[user text ⟵ breakpoint 2] [images…] [app_state]`.
+The current turn is laid out as `[user text ⟵ breakpoint 2] [images…] [app_state]`. A third, automatic breakpoint (top-level `cache_control`) sits on the last block of each request, so the next tool round reads the images, `<app_state>` and the previous round from cache.
 Earlier turns are replayed as `[user text] ([N images attached] note)`, so each earlier turn's first block is byte-identical to how it was originally sent. That means the next request reads everything up to the previous user text from cache.
 
-History is replayed as plain text: earlier tool calls aren't resent, because their effects are already in `<app_state>`. The window keeps the last 30–60 messages and moves in steps of 30, so the cached prefix stays stable between steps.
+History is replayed as plain text: earlier tool calls aren't resent, because their effects are already in `<app_state>`. `historyWindow()` (shared by all three backends) keeps the last 12–24 messages and moves in steps of 12, so the cached prefix stays stable between steps. Photos are downscaled to 1280 px. Every response's `usage` is recorded per day (`usage.ts`) and shown in the profile with an estimated cost and cache hit rate. See [COST_OPTIMIZATION.md](COST_OPTIMIZATION.md) for the token profile and the reasoning.
 
 ### Tool loop
 

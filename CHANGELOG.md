@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 – 2026-09-27
+
+Claude token-cost review ([docs/COST_OPTIMIZATION.md](docs/COST_OPTIMIZATION.md)): about 40% less input per request on a realistic data set, with no change in behavior.
+
+- Automatic caching of the tool-loop tail, so the second round of a message reads images, app state and the first round from cache.
+- Chat history replay trimmed from 30–60 to 12–24 messages in all backends. The day's data already reaches the coach as structured state.
+- Photos downscaled to 1280 px, about 33% fewer image tokens.
+- Favorites listed compactly in the app state.
+- A Claude usage panel in the profile (requests, estimated cost, cache hit rate) and a thinking-depth setting (default unchanged: medium).
+- Fix: image-only messages are replayed in history with the same first block as when sent.
+
 ## 1.3.0 – 2026-09-27
 
 - **Google Gemini as a free option** in the standalone app, next to Claude (API key), which stays available. Choose the provider in the profile screen. Models: Gemini 3.8 Flash (default) and Gemini 3.5 Flash-Lite.
