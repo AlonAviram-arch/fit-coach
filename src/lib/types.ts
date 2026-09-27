@@ -150,6 +150,8 @@ export interface Settings {
   apiKey: string;
   /** Claude model id. */
   model: string;
+  /** Claude thinking depth (output_config.effort); medium when unset. */
+  effort?: 'low' | 'medium' | 'high';
   geminiKey?: string;
   geminiModel?: string;
   /** Model tier when running inside claude.ai on the user's subscription. */

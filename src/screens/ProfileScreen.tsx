@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import UsagePanel from '../components/UsagePanel';
 import { useBackend } from '../lib/backend';
 import { DEFAULT_GEMINI_MODEL, GEMINI_MODELS, MODELS } from '../lib/models';
 import { ACTIVITY_LABELS, adaptiveEstimate, addDays, computeTargets, currentWeight, today } from '../lib/nutrition';
@@ -327,6 +328,16 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
                   {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label} — {m.note}</option>)}
                 </select>
               </label>
+              {!data.settings.model.startsWith('claude-haiku') && (
+                <label>רמת חשיבה
+                  <select id="claude-effort" value={data.settings.effort ?? 'medium'} onChange={(e) => saveSettings({ effort: e.target.value as 'low' | 'medium' | 'high' })}>
+                    <option value="low">נמוכה (זול ומהיר, מתאים לרישום יומיומי)</option>
+                    <option value="medium">בינונית (ברירת מחדל)</option>
+                    <option value="high">גבוהה (מעמיק ויקר יותר)</option>
+                  </select>
+                </label>
+              )}
+              <UsagePanel />
             </>
           ) : (
             <>

@@ -4,6 +4,7 @@ import { getData } from './store';
 import { runTool, TOOLS } from './tools';
 import { assistantReplayText, historyWindow, imagesNote, type ImageInput, type SendCallbacks } from './coachShared';
 import type { ChatMessage } from './types';
+import { recordUsage } from './usage';
 
 type MessageParam = Anthropic.Beta.BetaMessageParam;
 type ContentBlockParam = Anthropic.Beta.BetaContentBlockParam;
@@ -33,18 +34,23 @@ function historyMessages(chat: ChatMessage[]): MessageParam[] {
   return msgs;
 }
 
-function requestOptions(model: string) {
+/**
+ * Model-specific request options. Effort is the user's setting (medium by
+ * default); it stays the same for a whole conversation, since changing it
+ * invalidates the cached history once.
+ */
+function requestOptions(model: string, effort: 'low' | 'medium' | 'high') {
   if (model.startsWith('claude-haiku')) return {};
   if (model === 'claude-opus-5') {
     // Opus 5 thinks adaptively by default; server-side fallbacks re-run a
     // (rare) safety-classifier decline on the recommended fallback model.
     return {
-      output_config: { effort: 'medium' as const },
+      output_config: { effort },
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default' as const,
     };
   }
-  return { thinking: { type: 'adaptive' as const }, output_config: { effort: 'medium' as const } };
+  return { thinking: { type: 'adaptive' as const }, output_config: { effort } };
 }
 
 /**
@@ -112,7 +118,7 @@ export async function sendToCoach(
       // Automatic breakpoint on the last block: the next tool round reads the
       // images, <app_state> and earlier rounds from cache instead of re-billing them.
       cache_control: { type: 'ephemeral' },
-      ...requestOptions(model),
+      ...requestOptions(model, settings.effort ?? 'medium'),
     });
 
     const prefix = shown ? shown + '\n\n' : '';
@@ -126,6 +132,7 @@ export async function sendToCoach(
     try {
       message = await stream.finalMessage();
       jsonRetries = 0;
+      recordUsage(message.model, message.usage);
     } catch (err) {
       // Only an unparseable streamed tool input is retried; API errors surface.
       if (err instanceof Anthropic.APIError || jsonRetries++ >= 2) throw err;
