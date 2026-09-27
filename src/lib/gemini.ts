@@ -1,4 +1,4 @@
-import { assistantReplayText, imagesNote, type ImageInput, type SendCallbacks, usableHistory } from './coachShared';
+import { assistantReplayText, historyWindow, imagesNote, type ImageInput, type SendCallbacks, userReplayText } from './coachShared';
 import { DEFAULT_GEMINI_MODEL } from './models';
 import { buildAppState, SYSTEM_PROMPT } from './prompt';
 import { getData } from './store';
@@ -51,9 +51,9 @@ const FUNCTION_DECLARATIONS = TOOLS.map((t) => ({ name: t.name, description: t.d
 /** Past chat as Gemini contents: user/model turns, consecutive same-role turns merged. */
 function historyContents(chat: ChatMessage[]): Content[] {
   const out: Content[] = [];
-  for (const m of usableHistory(chat).slice(-40)) {
+  for (const m of historyWindow(chat)) {
     const role = m.role === 'assistant' ? 'model' : 'user';
-    const text = m.role === 'assistant' ? assistantReplayText(m) : `${m.text}${m.images ? `\n${imagesNote(m.images)}` : ''}`;
+    const text = m.role === 'assistant' ? assistantReplayText(m) : userReplayText(m);
     if (!text.trim()) continue;
     const last = out[out.length - 1];
     if (last?.role === role) last.parts.push({ text });

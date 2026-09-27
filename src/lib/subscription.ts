@@ -1,4 +1,4 @@
-import { assistantReplayText, imagesNote, type ImageInput, type SendCallbacks, usableHistory } from './coachShared';
+import { assistantReplayText, historyWindow, imagesNote, type ImageInput, type SendCallbacks, userReplayText } from './coachShared';
 import { buildAppState, SYSTEM_PROMPT } from './prompt';
 import { getSample, type SampleError, type SampleTool } from './runtime';
 import { getData } from './store';
@@ -46,11 +46,10 @@ function buildTurns(userText: string, imageCount: number, prior: ChatMessage[]):
     content: `${userText || imagesNote(imageCount)}${imageCount && userText ? `\n${imagesNote(imageCount)}` : ''}\n\n${buildAppState(getData())}`,
   };
 
-  const history: Turn[] = usableHistory(prior)
-    .slice(-40)
+  const history: Turn[] = historyWindow(prior)
     .map((m) => ({
       role: m.role,
-      content: m.role === 'assistant' ? assistantReplayText(m) : `${m.text}${m.images ? `\n${imagesNote(m.images)}` : ''}`,
+      content: m.role === 'assistant' ? assistantReplayText(m) : userReplayText(m),
     }))
     .filter((t) => t.content.trim());
 

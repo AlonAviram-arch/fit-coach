@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { buildAppState, SYSTEM_PROMPT } from './prompt';
 import { getData } from './store';
 import { runTool, TOOLS } from './tools';
-import { assistantReplayText, imagesNote, type ImageInput, type SendCallbacks, usableHistory } from './coachShared';
+import { assistantReplayText, historyWindow, imagesNote, type ImageInput, type SendCallbacks } from './coachShared';
 import type { ChatMessage } from './types';
 
 type MessageParam = Anthropic.Beta.BetaMessageParam;
@@ -13,17 +13,17 @@ const MAX_TOOL_ROUNDS = 8;
 /**
  * Past chat as API messages. Tool calls are not replayed: their effects are
  * already in the data, which the model sees through <app_state>.
- * The window moves in steps of 30 messages so the cached prefix stays stable
- * between steps.
+ * Each user turn's first block is byte-identical to how it was first sent
+ * (the text, or the images note for an image-only message), so the cache
+ * breakpoint that request wrote on it is read back here.
  */
 function historyMessages(chat: ChatMessage[]): MessageParam[] {
-  const usable = usableHistory(chat);
-  const start = Math.max(0, Math.floor((usable.length - 30) / 30) * 30);
   const msgs: MessageParam[] = [];
-  for (const m of usable.slice(start)) {
+  for (const m of historyWindow(chat)) {
     if (m.role === 'user') {
-      const content: ContentBlockParam[] = [{ type: 'text', text: m.text }];
-      if (m.images) content.push({ type: 'text', text: imagesNote(m.images) });
+      const first = m.text.trim() ? m.text : imagesNote(m.images ?? 0);
+      const content: ContentBlockParam[] = [{ type: 'text', text: first }];
+      if (m.images && m.text.trim()) content.push({ type: 'text', text: imagesNote(m.images) });
       msgs.push({ role: 'user', content });
     } else {
       msgs.push({ role: 'assistant', content: assistantReplayText(m) });
