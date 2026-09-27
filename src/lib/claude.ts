@@ -109,6 +109,9 @@ export async function sendToCoach(
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       tools: TOOLS,
       messages,
+      // Automatic breakpoint on the last block: the next tool round reads the
+      // images, <app_state> and earlier rounds from cache instead of re-billing them.
+      cache_control: { type: 'ephemeral' },
       ...requestOptions(model),
     });
 
