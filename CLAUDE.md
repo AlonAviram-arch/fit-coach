@@ -13,4 +13,4 @@ Conventions:
 - Dates are local `YYYY-MM-DD` strings. Use the helpers in `nutrition.ts`, never `toISOString()` (it converts to UTC).
 - Data shape changes must stay compatible with existing `localStorage` data (`fit-coach-data-v1`) and with backup import.
 - Never use `confirm`/`prompt`/`alert` or download links: the claude.ai viewer blocks them. Use `ask`/`confirmThen` from `src/lib/dialog.ts`.
-- Anything that touches Claude must work in both backends (`claude.ts` and `subscription.ts`); tools live once in `tools.ts`.
+- The coach has three backends: `claude.ts` (Claude API key), `gemini.ts` (Gemini, free) and `subscription.ts` (claude.ai `sample`). Anything that touches the coach must work in all three; tools live once in `tools.ts`.

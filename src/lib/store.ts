@@ -208,14 +208,22 @@ export function clearChat() {
 // ---- Backup ----
 
 export function exportJson(): string {
-  // The API key never leaves the device in a backup file.
-  return JSON.stringify({ ...data, settings: { ...data.settings, apiKey: '' } }, null, 2);
+  // API keys never leave the device in a backup file.
+  return JSON.stringify({ ...data, settings: { ...data.settings, apiKey: '', geminiKey: '' } }, null, 2);
 }
 
 export function importJson(json: string) {
   const parsed = JSON.parse(json) as Partial<AppData>;
   if (parsed.version !== 1) throw new Error('קובץ גיבוי לא נתמך');
-  commit({ ...emptyData(), ...parsed, settings: { ...data.settings, model: parsed.settings?.model || data.settings.model } });
+  commit({
+    ...emptyData(),
+    ...parsed,
+    settings: {
+      ...data.settings,
+      model: parsed.settings?.model || data.settings.model,
+      geminiModel: parsed.settings?.geminiModel || data.settings.geminiModel,
+    },
+  });
 }
 
 export function resetAll() {

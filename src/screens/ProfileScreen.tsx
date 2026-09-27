@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useBackend } from '../lib/backend';
-import { MODELS } from '../lib/models';
+import { DEFAULT_GEMINI_MODEL, GEMINI_MODELS, MODELS } from '../lib/models';
 import { ACTIVITY_LABELS, adaptiveEstimate, addDays, computeTargets, currentWeight, today } from '../lib/nutrition';
 import {
   addWeighIn, exportJson, getData, importJson, resetAll, saveProfile, saveSettings, useData,
@@ -44,8 +44,10 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
   const [form, setForm] = useState<Form>(() => toForm(data.profile, currentWeight(data)));
   const [custom, setCustom] = useState<Targets | null>(data.profile?.customTargets ?? null);
   const [apiKey, setApiKey] = useState(data.settings.apiKey);
+  const [geminiKey, setGeminiKey] = useState(data.settings.geminiKey ?? '');
+  const provider = data.settings.provider ?? 'claude';
   const [saved, setSaved] = useState(false);
-  const backend = useBackend(data.settings.apiKey);
+  const backend = useBackend(data.settings);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm({ ...form, [k]: e.target.value });
@@ -107,10 +109,11 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
         hipsCm: p.hipsCm, chestCm: p.chestCm, armCm: p.armCm, thighCm: p.thighCm, note: 'מדידת פתיחה',
       });
     }
-    saveSettings({ apiKey: apiKey.trim() });
+    saveSettings({ apiKey: apiKey.trim(), geminiKey: geminiKey.trim() });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-    if (isNew && (apiKey.trim() || backend === 'subscription')) onDone();
+    const hasKey = provider === 'gemini' ? geminiKey.trim() : apiKey.trim();
+    if (isNew && (hasKey || backend === 'subscription')) onDone();
   }
 
   function download() {
@@ -274,7 +277,7 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
         )}
 
         <section className="card form">
-          <h3 className="card-title">חיבור ל-Claude</h3>
+          <h3 className="card-title">חיבור ל-AI</h3>
           {backend === 'subscription' ? (
             <>
               <p className="connected">✓ מחובר דרך חשבון Claude שלך. השימוש נספר במנוי (למשל Pro), בלי מפתח API ובלי תשלום נוסף.</p>
@@ -292,21 +295,59 @@ export default function ProfileScreen({ onDone }: { onDone: () => void }) {
           ) : (
           <>
           <p className="muted small">
-            יש לך מנוי Claude Pro? אפשר לפתוח את האפליקציה דרך הקישור שלה ב-claude.ai, ואז היא עובדת עם המנוי בלי מפתח API.
-            כאן, מחוץ ל-claude.ai, צריך מפתח API.
+            יש לך מנוי Claude Pro? אפשר לפתוח את האפליקציה דרך הקישור שלה ב-claude.ai, ואז היא עובדת עם המנוי בלי מפתח.
+            כאן, מחוץ ל-claude.ai, בוחרים ספק ומזינים מפתח.
           </p>
-          <label>מפתח API
-            <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-…" autoComplete="off" dir="ltr" />
-          </label>
-          <p className="muted small">
-            יוצרים מפתח ב-<a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">console.anthropic.com</a>.
-            המפתח נשמר רק במכשיר הזה ונשלח ישירות ל-Anthropic.
-          </p>
-          <label>מודל
-            <select value={data.settings.model} onChange={(e) => saveSettings({ model: e.target.value })}>
-              {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label} — {m.note}</option>)}
-            </select>
-          </label>
+          <div className="segmented wide" role="radiogroup" aria-label="ספק AI">
+            {([['claude', 'Claude · מפתח API בתשלום'], ['gemini', 'Gemini · חינם']] as const).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={provider === id}
+                className={provider === id ? 'active' : ''}
+                onClick={() => saveSettings({ provider: id })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {provider === 'claude' ? (
+            <>
+              <label>מפתח API של Claude
+                <input id="claude-key" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-…" autoComplete="off" dir="ltr" />
+              </label>
+              <p className="muted small">
+                יוצרים מפתח ב-<a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">console.anthropic.com</a>.
+                התשלום לפי שימוש. המפתח נשמר רק במכשיר הזה ונשלח ישירות ל-Anthropic.
+              </p>
+              <label>מודל
+                <select id="claude-model" value={data.settings.model} onChange={(e) => saveSettings({ model: e.target.value })}>
+                  {MODELS.map((m) => <option key={m.id} value={m.id}>{m.label} — {m.note}</option>)}
+                </select>
+              </label>
+            </>
+          ) : (
+            <>
+              <label>מפתח API של Gemini
+                <input id="gemini-key" type="password" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} placeholder="AIza…" autoComplete="off" dir="ltr" />
+              </label>
+              <p className="muted small">
+                יוצרים מפתח חינמי ב-<a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a> עם חשבון Google.
+                המפתח נשמר רק במכשיר הזה ונשלח ישירות ל-Google.
+              </p>
+              <label>מודל
+                <select id="gemini-model" value={data.settings.geminiModel ?? DEFAULT_GEMINI_MODEL} onChange={(e) => saveSettings({ geminiModel: e.target.value })}>
+                  {GEMINI_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label} — {m.note}</option>)}
+                </select>
+              </label>
+              <p className="warn small">
+                בשכבה החינמית Google רשאית להשתמש בשיחות לשיפור המוצרים שלה, ויש מגבלת בקשות לדקה וליום.
+                כדאי לא לשתף מידע רפואי רגיש.
+              </p>
+            </>
+          )}
           </>
           )}
         </section>

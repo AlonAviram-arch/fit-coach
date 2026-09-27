@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0 – 2026-09-27
+
+- **Google Gemini as a free option** in the standalone app, next to Claude (API key), which stays available. Choose the provider in the profile screen. Models: Gemini 3.8 Flash (default) and Gemini 3.5 Flash-Lite.
+- The Gemini backend uses streaming REST with function calling: same prompt, tools, suggestion cards and photos as Claude, and thought signatures are echoed back unchanged.
+- Hebrew errors for Gemini's free-tier limits, invalid keys, unavailable models and safety blocks. A privacy note explains that free-tier content may be used by Google.
+- The Gemini key, like the Claude key, stays on the device and is left out of backups and cloud sync.
+
 ## 1.2.0 – 2026-09-27
 
 - **Runs on your Claude subscription:** published as a claude.ai artifact (https://claude.ai/artifact/2Nd8HvkAwi7R9g3jxNQ3Gw). Inside claude.ai the coach reaches Claude through the viewer's `sample` capability, on the user's own Pro/Max plan, with no API key. All tools work as page functions, with a model tier setting.

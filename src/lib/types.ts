@@ -144,8 +144,14 @@ export interface ChatMessage {
 }
 
 export interface Settings {
+  /** Which AI the standalone app uses (inside claude.ai the subscription is always used). */
+  provider?: 'claude' | 'gemini';
+  /** Claude API key. */
   apiKey: string;
+  /** Claude model id. */
   model: string;
+  geminiKey?: string;
+  geminiModel?: string;
   /** Model tier when running inside claude.ai on the user's subscription. */
   tier?: 'default' | 'complex' | 'quick';
 }

@@ -3,12 +3,15 @@
 A Hebrew, chat-first mobile app for tracking diet and training every day, powered by Claude.
 You tell the coach what you ate (or send a photo of your plate or a nutrition label), what workout you did, or what you weighed. Claude logs it, works out calories and macros, and keeps you on track toward your weight and fitness goals.
 
-**Two ways to run it** (same app, same code):
+**Three ways to run it** (same app, same code):
 
-| | Opens at | Claude access | Your data |
+| | Opens at | AI | Your data |
 |---|---|---|---|
 | **In claude.ai** *(recommended with a Claude Pro/Max plan)* | https://claude.ai/artifact/2Nd8HvkAwi7R9g3jxNQ3Gw | Your Claude subscription. No API key and no extra cost; usage counts toward your plan's limits. | Synced to your private space in the artifact's database, on every device you sign in on |
-| **Standalone PWA** | https://alonaviram-arch.github.io/fit-coach/ | Your own Claude API key (pay per use) | Only in that phone's browser (with JSON backup) |
+| **Standalone PWA + Gemini** *(free, installable app)* | https://alonaviram-arch.github.io/fit-coach/ | Google Gemini with a free Gemini API key | Only in that phone's browser (with JSON backup) |
+| **Standalone PWA + Claude API** | same link | Claude with your own API key (pay per use) | Only in that phone's browser (with JSON backup) |
+
+The standalone app lets you switch between Gemini and Claude any time in the profile screen.
 
 The claude.ai link is private to its owner. To use it from another account, publish your own copy (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#publishing-the-claudeai-artifact)).
 
@@ -47,7 +50,15 @@ Open the app from its claude.ai link. Inside claude.ai the app reaches Claude th
 - Photos work wherever the viewer supports sending images.
 - Your log is saved in your private `data/users/<you>/` space. Nobody else can read it, including other people the artifact is shared with.
 
-### With an API key (standalone PWA)
+### With Gemini, free (standalone PWA)
+
+1. Create a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey) with a Google account.
+2. In the app's profile screen, choose **Gemini · חינם**, paste the key, and save.
+3. Models: **Gemini 3.8 Flash** (recommended) or **Gemini 3.5 Flash-Lite** (faster, larger free quota).
+
+All the coach features work the same way: logging tools, suggestion cards, favorites and photos. Two things to know about the free tier: Google may use the content to improve its products, and there are per-minute and per-day request limits. When a limit is hit, the app shows a message asking you to try again later.
+
+### With a Claude API key (standalone PWA)
 
 Outside claude.ai, a claude.ai subscription can't be used by apps, so the PWA needs an API key:
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import DialogHost from './components/DialogHost';
+import { standaloneBackend } from './lib/backend';
 import { inClaudeViewer } from './lib/runtime';
 import { useData } from './lib/store';
 import ChatScreen from './screens/ChatScreen';
@@ -20,7 +21,7 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 export default function App() {
   const data = useData();
-  const needsSetup = !data.profile || (!data.settings.apiKey && !inClaudeViewer);
+  const needsSetup = !data.profile || (!inClaudeViewer && standaloneBackend(data.settings) === 'none');
   const [tab, setTab] = useState<Tab>(needsSetup ? 'profile' : 'chat');
 
   return (

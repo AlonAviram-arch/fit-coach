@@ -5,6 +5,7 @@ import MacroBars from '../components/MacroBars';
 import SuggestionCard from '../components/SuggestionCard';
 import { useBackend } from '../lib/backend';
 import type { ImageInput } from '../lib/coachShared';
+import { geminiErrorText, sendViaGemini } from '../lib/gemini';
 import { sendViaSubscription, subscriptionErrorText } from '../lib/subscription';
 import { fileToImage, renderMarkdown } from '../lib/media';
 import { activeTargets, entriesForDate, sumEntries, today } from '../lib/nutrition';
@@ -22,7 +23,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
   const [images, setImages] = useState<PendingImage[]>([]);
   const [busy, setBusy] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
-  const backend = useBackend(data.settings.apiKey);
+  const backend = useBackend(data.settings);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -65,12 +66,15 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
       },
     };
 
-    if (backend === 'subscription') {
+    if (backend === 'subscription' || backend === 'gemini') {
+      const viaGemini = backend === 'gemini';
       try {
-        const finalText = await sendViaSubscription(trimmed, sentImages, prior, callbacks);
+        const finalText = viaGemini
+          ? await sendViaGemini(trimmed, sentImages, prior, callbacks)
+          : await sendViaSubscription(trimmed, sentImages, prior, callbacks);
         updateChatMessage(reply.id, { text: finalText || (suggestions.length ? '' : actions.length ? 'רשמתי ✔️' : '') });
       } catch (err) {
-        updateChatMessage(reply.id, { text: subscriptionErrorText(err), error: true });
+        updateChatMessage(reply.id, { text: viaGemini ? geminiErrorText(err) : subscriptionErrorText(err), error: true });
       } finally {
         setBusy(false);
       }
@@ -116,7 +120,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
               ? 'כדי שאוכל לחשב יעדים, מלאו קודם את הפרופיל.'
               : backend === 'checking'
                 ? 'מתחבר ל-Claude…'
-                : 'אין חיבור ל-Claude. אפשר לפתוח את האפליקציה דרך claude.ai (עם המנוי שלך) או להזין מפתח API.'}{' '}
+                : 'עוד אין חיבור ל-AI. אפשר לפתוח את האפליקציה דרך claude.ai עם המנוי שלך, או להזין מפתח Gemini (חינם) או מפתח Claude בפרופיל.'}{' '}
             <button className="link" onClick={() => goTo('profile')}>למסך הפרופיל ←</button>
           </div>
         )}

@@ -5,7 +5,7 @@ Fit Coach is a static single-page app with no backend of its own. One build runs
 | | Standalone PWA (GitHub Pages) | claude.ai artifact |
 |---|---|---|
 | Detected by | no `window.claude` | `window.claude.use` exists (set by the claude.ai viewer before page scripts run) |
-| Claude | `@anthropic-ai/sdk` with the user's API key (`claude.ts`) | the viewer's `sample` capability, billed to the viewer's Claude plan (`subscription.ts`) |
+| AI | the user picks one: **Claude** (`@anthropic-ai/sdk` with their API key, `claude.ts`) or **Gemini** (REST with their free Gemini key, `gemini.ts`) | the viewer's `sample` capability, billed to the viewer's Claude plan (`subscription.ts`) |
 | Storage | `localStorage` only | the artifact `db`, in the viewer's private subtree, plus `localStorage` as a cache (`cloud.ts`) |
 | Dialogs, downloads | native | the viewer blocks `confirm`/`prompt`/`alert` and download links, so the app uses in-app dialogs (`dialog.ts`) and hides export there |
 
@@ -34,7 +34,8 @@ The standalone PWA works like this:
 | `src/lib/claude.ts` | SDK client, history windowing, the streaming tool-use loop, and error messages |
 | `src/lib/models.ts` | The model picker list |
 | `src/lib/runtime.ts` | Detects the claude.ai viewer and types the capabilities used (`sample`, `db`, `user`) |
-| `src/lib/backend.ts` | `useBackend()`: `subscription`, `api`, `none` or `checking` |
+| `src/lib/backend.ts` | `useBackend()`: `subscription`, `api` (Claude key), `gemini`, `none` or `checking` |
+| `src/lib/gemini.ts` | The coach loop on Google Gemini (`streamGenerateContent` over SSE, function calling) |
 | `src/lib/subscription.ts` | The coach loop on the Claude subscription, through `sample` with page tools |
 | `src/lib/cloud.ts` | Loads and syncs data with the artifact database |
 | `src/lib/coachShared.ts` | Types and history helpers shared by both backends |
@@ -119,6 +120,16 @@ Past cards are replayed to Claude as a text note (`[כרטיסי הצעה שהו
 - **Streaming and cost:** `onText` streams the whole answer so far. Every tool round is a separate request on the user's plan. Claude's model tier comes from the profile setting.
 - **Errors:** `rate_limited` (plan limit), `not_granted` (the user declined), and the other codes map to Hebrew messages. Text that already streamed is kept.
 
+## Gemini backend (standalone)
+
+`sendViaGemini` calls `POST https://generativelanguage.googleapis.com/v1beta/models/<model>:streamGenerateContent?alt=sse` with plain `fetch`. The key goes in the `x-goog-api-key` header, and Google allows these calls from the browser (CORS).
+
+- **Request:** `systemInstruction` = `SYSTEM_PROMPT`. `contents` = history (user/model turns, same-role turns merged, the last 40 messages) plus the new user turn: text, `inlineData` images, then `<app_state>`. `tools[0].functionDeclarations` reuses the same JSON schemas as the Claude tools.
+- **Tool loop (up to 8 rounds):** SSE chunks are parsed, and text parts stream to the UI (parts marked `thought` are skipped). Every part is collected **exactly as received**. When the model returns `functionCall` parts, its whole turn is echoed back unchanged, because the thinking guide requires thought signatures to be returned untouched. The app then runs the tools and sends one `user` turn of `functionResponse` parts (`{name, id, response: {result}}` or `{error}`).
+- **Stop conditions:** `MAX_TOKENS` adds a "cut short" note. A blocked prompt or a non-`STOP` finish with no text raises an error.
+- **Errors:** invalid key (400), no permission (403), unknown model (404), free-tier quota (429), safety blocks and 5xx each map to a Hebrew message.
+- **Models:** `gemini-3.8-flash` (default) and `gemini-3.5-flash-lite`, both on the free tier (checked 2026-09-27 against ai.google.dev).
+
 ## Cloud storage (claude.ai)
 
 `initCloudSync` runs before the first render inside claude.ai, waiting at most 8 s:
@@ -161,7 +172,7 @@ Energy balance from real data over the last 28 days (excluding today):
 
 ## Security and privacy
 
-- The API key is stored in `localStorage`, left out of backup exports, and never written to the cloud.
+- API keys (Claude and Gemini) are stored in `localStorage`, left out of backup exports, and never written to the cloud.
 - In claude.ai, the page never sees any credential: `sample` runs on the viewer's session.
 - Claude's markdown is sanitized with DOMPurify before it's rendered.
 - No analytics and no backend. Google Fonts (Heebo) is the only third-party request apart from the Anthropic API.
