@@ -2,7 +2,8 @@ import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import type { ImageInput } from './coachShared';
 
-const MAX_EDGE = 1568; // Claude's recommended max image edge
+// ~1,600 tokens per photo on Claude instead of ~2,450 at 1568 px; labels stay legible.
+const MAX_EDGE = 1280;
 
 /** Downscales a photo and returns it as base64 JPEG for the API. */
 export async function fileToImage(file: File): Promise<ImageInput & { previewUrl: string }> {
