@@ -114,6 +114,22 @@ export interface FavoriteMeal {
   createdAt: string;
 }
 
+/** A packaged product whose exact values were read from its nutrition label. */
+export interface Product {
+  id: string;
+  name: string;
+  /** The label's basis: values are per 100 g or per 100 ml. */
+  basis: '100g' | '100ml';
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  /** Serving size from the label, in g or ml (matching the basis). */
+  servingSize?: number;
+  servingLabel?: string;
+  updatedAt: string;
+}
+
 /** Per-day lifestyle metrics. */
 export interface DailyMetric {
   date: string;
@@ -165,6 +181,7 @@ export interface AppData {
   workouts: Workout[];
   weighIns: WeighIn[];
   favorites: FavoriteMeal[];
+  products: Product[];
   metrics: DailyMetric[];
   chat: ChatMessage[];
   settings: Settings;

@@ -11,7 +11,7 @@ import { fileToImage, renderMarkdown } from '../lib/media';
 import { activeTargets, entriesForDate, sumEntries, today } from '../lib/nutrition';
 import { addChatMessage, clearChat, getData, updateChatMessage, useData } from '../lib/store';
 import type { ActionChip, MealSuggestion } from '../lib/types';
-import { confirmThen } from '../lib/dialog';
+import { ask, confirmThen } from '../lib/dialog';
 
 const QUICK_PROMPTS = ['מה לאכול עכשיו?', 'מה נשאר לי להיום?', 'סיימתי להיום', 'סיכום שבועי'];
 
@@ -26,6 +26,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
   const backend = useBackend(data.settings);
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const totals = sumEntries(entriesForDate(data, today()));
   const targets = activeTargets(data);
@@ -35,9 +36,13 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
   }, [data.chat]);
 
   async function onPickFiles(files: FileList | null) {
-    if (!files) return;
-    const picked = await Promise.all(Array.from(files).slice(0, 4).map(fileToImage));
-    setImages((prev) => [...prev, ...picked].slice(0, 4));
+    if (!files?.length) return;
+    try {
+      const picked = await Promise.all(Array.from(files).slice(0, 4).map(fileToImage));
+      setImages((prev) => [...prev, ...picked].slice(0, 4));
+    } catch {
+      ask.notice('לא הצלחתי לקרוא את התמונה. נסו לצלם שוב או לבחור תמונה אחרת.');
+    }
   }
 
   async function send(messageText: string) {
@@ -134,7 +139,7 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
           <div key={m.id} className="event-note">{m.text.replace(/^\[|\]$/g, '')}</div>
         ) : (
           <div key={m.id} className={`msg ${m.role}${m.error ? ' error' : ''}${m.suggestions?.length ? ' has-cards' : ''}`}>
-            {m.images ? <div className="msg-images">📷 {m.images} תמונות</div> : null}
+            {m.images ? <div className="msg-images">📷 {m.images === 1 ? "תמונה" : `${m.images} תמונות`}</div> : null}
             {m.role === 'assistant' ? (
               m.text ? (
                 <div className="md" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.text) }} />
@@ -161,9 +166,10 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
       </div>
 
       <div className="composer">
-        {!busy && data.chat.length > 0 && (
+        {!busy && (
           <div className="quick">
-            {QUICK_PROMPTS.map((q) => (
+            <button className="quick-btn" onClick={() => setShowFavorites(true)}>⭐ מועדפים</button>
+            {data.chat.length > 0 && QUICK_PROMPTS.map((q) => (
               <button key={q} className="quick-btn" onClick={() => send(q)} disabled={missingKey}>{q}</button>
             ))}
           </div>
@@ -185,13 +191,15 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
             send(text);
           }}
         >
-          <button type="button" className="icon-btn" onClick={() => fileRef.current?.click()} aria-label="צירוף תמונה" disabled={busy}>
+          <button type="button" className="icon-btn" onClick={() => cameraRef.current?.click()} aria-label="צילום תמונה" title="צילום" disabled={busy}>
             📷
           </button>
-          <button type="button" className="icon-btn" onClick={() => setShowFavorites(true)} aria-label="מועדפים" disabled={busy}>
-            ⭐
+          <button type="button" className="icon-btn" onClick={() => fileRef.current?.click()} aria-label="בחירת תמונה מהגלריה" title="מהגלריה" disabled={busy}>
+            🖼️
           </button>
-          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }} />
+          {/* `capture` opens the phone's camera directly; without it the gallery picker opens. */}
+          <input id="chat-camera" ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }} />
+          <input id="chat-gallery" ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }} />
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}

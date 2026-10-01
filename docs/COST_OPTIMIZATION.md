@@ -55,6 +55,10 @@ Verified in the browser harness: consecutive messages share a byte-identical pre
 4. `Cost: downscale photos to 1280 px instead of 1568 px`
 5. `Cost: record Claude usage per day and add a thinking-depth setting`
 
+## Update, 2026-10-01: photo size reverted
+
+The "photos at 1280 px" change (commit 4) was reverted in v1.5.0. Reading nutrition labels correctly became an explicit requirement, and 1568 px keeps the small print legible. This costs about 800 more tokens per photo per round. The other changes stand. v1.5.0 also adds two small tools and a longer system prompt (the label rules and tone guidance), about 700 more tokens in the cached prefix, and up to 25 one-line saved products in `<app_state>`.
+
 ## Levers considered and skipped
 
 - **1-hour cache TTL:** meals are usually more than an hour apart. The 2x write wouldn't be read back, and within a burst the 5-minute TTL is already refreshed.

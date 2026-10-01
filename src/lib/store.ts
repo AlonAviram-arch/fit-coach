@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type {
-  AppData, ChatMessage, DailyMetric, FavoriteMeal, FoodEntry, FoodItem, MealType, Profile, Settings, WeighIn, Workout,
+  AppData, ChatMessage, DailyMetric, FavoriteMeal, FoodEntry, FoodItem, MealType, Product, Profile, Settings, WeighIn, Workout,
 } from './types';
 
 const STORAGE_KEY = 'fit-coach-data-v1';
@@ -14,6 +14,7 @@ function emptyData(): AppData {
     workouts: [],
     weighIns: [],
     favorites: [],
+    products: [],
     metrics: [],
     chat: [],
     settings: { apiKey: '', model: DEFAULT_MODEL },
@@ -163,6 +164,25 @@ export function deleteFavorite(id: string): boolean {
   if (!data.favorites.some((f) => f.id === id)) return false;
   commit({ ...data, favorites: data.favorites.filter((f) => f.id !== id) });
   return true;
+}
+
+// ---- Products (nutrition labels) ----
+
+/** Adds a product, or replaces the one with the same name. */
+export function saveProduct(p: Omit<Product, 'id' | 'updatedAt'>): Product {
+  const name = p.name.trim();
+  const existing = data.products.find((x) => x.name.trim() === name);
+  const product: Product = { ...p, name, id: existing?.id ?? uid(), updatedAt: new Date().toISOString() };
+  commit({ ...data, products: [...data.products.filter((x) => x.id !== product.id), product] });
+  return product;
+}
+
+export function deleteProduct(idOrName: string): Product | null {
+  const key = idOrName.trim();
+  const found = data.products.find((x) => x.id === key) ?? data.products.find((x) => x.name.trim() === key);
+  if (!found) return null;
+  commit({ ...data, products: data.products.filter((x) => x.id !== found.id) });
+  return found;
 }
 
 // ---- Daily metrics (water / steps / sleep) ----

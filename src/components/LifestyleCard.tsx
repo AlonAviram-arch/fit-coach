@@ -4,8 +4,9 @@ import { setMetric, useData } from '../lib/store';
 import type { DailyMetric } from '../lib/types';
 
 const GLASS_ML = 250;
+const BOTTLE_ML = 750;
 
-/** Water (tap per glass), steps and last night's sleep for one day. */
+/** Water (tap per glass or bottle), steps and last night's sleep for one day. */
 export default function LifestyleCard({ date }: { date: string }) {
   const data = useData();
   const metric = data.metrics.find((m) => m.date === date) ?? { date };
@@ -27,9 +28,14 @@ export default function LifestyleCard({ date }: { date: string }) {
             <span key={i} className={i < glasses ? 'glass full' : 'glass'} />
           ))}
         </div>
-        <div className="row">
-          <button className="icon-btn small" onClick={() => setMetric(date, { waterMl: Math.max(0, water - GLASS_ML) })} disabled={!water} aria-label="הורדת כוס">−</button>
-          <button className="btn primary" onClick={() => setMetric(date, { waterMl: water + GLASS_ML })}>+ כוס</button>
+        <div className="row water-actions">
+          <button className="icon-btn small" onClick={() => setMetric(date, { waterMl: Math.max(0, water - GLASS_ML) })} disabled={!water} aria-label="הורדת כוס (250 מ״ל)">−</button>
+          <button className="btn primary" onClick={() => setMetric(date, { waterMl: water + GLASS_ML })}>
+            + כוס <span className="btn-sub">250</span>
+          </button>
+          <button className="btn primary" onClick={() => setMetric(date, { waterMl: water + BOTTLE_ML })}>
+            + בקבוק <span className="btn-sub">750</span>
+          </button>
         </div>
       </div>
 

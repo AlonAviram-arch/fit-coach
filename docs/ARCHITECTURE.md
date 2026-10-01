@@ -51,7 +51,7 @@ The standalone PWA works like this:
 
 ## Data model
 
-Collections: `food`, `workouts`, `weighIns`, `favorites` (saved meals with a use count), `metrics` (per-day water, steps and sleep), and `chat`. Chat messages may carry `suggestions` (meal cards) and `kind: 'event'` for app-generated notes.
+Collections: `food`, `workouts`, `weighIns`, `favorites` (saved meals with a use count), `products` (exact per-100 g/ml values read from nutrition labels), `metrics` (per-day water, steps and sleep), and `chat`. Chat messages may carry `suggestions` (meal cards) and `kind: 'event'` for app-generated notes.
 All records carry an ISO local date (`YYYY-MM-DD`). Food entries hold a list of items, each with its own nutrition values, so per-meal and per-day totals are always computed from the items rather than stored.
 The first time the profile is saved, the profile weight and measurements become the first weigh-in, which gives progress tracking a starting point.
 
@@ -104,7 +104,16 @@ After a mid-output fallback, blocks that come before the last `fallback` marker 
 | `get_history` | Per-day totals, workouts, weigh-ins and metrics for a date range, used for weekly summaries |
 | `suggest_meal` | Shows a meal suggestion card (no logging). Called once per option, up to 3. |
 | `save_favorite` / `log_favorite` / `delete_favorite` | Favorite meals. `log_favorite` takes a portion multiplier; `save_favorite` can copy an existing entry. |
-| `log_daily_metrics` | Water (add, or set the total), steps, and last night's sleep |
+| `log_daily_metrics` | Water (add, or set the total; a glass is 250 ml, a bottle 750 ml), steps, and last night's sleep |
+| `save_product` / `delete_product` | Exact label values of a packaged product, per 100 g or 100 ml, with the serving size |
+
+### Nutrition labels and saved products
+
+Photos are sent only with the message they're attached to; later turns carry a text note instead of the image. So a label's numbers would be lost after one turn. The prompt's "Nutrition labels" section tells the coach to read the basis column first, never estimate over a label, check that calories roughly match the macros, ask when something is unreadable, and call `save_product`. Saved products are listed in `<app_state>` (the newest 25, one line each), and the coach scales them to the amount eaten on every later mention. Photos are kept at 1568 px, the largest edge Claude reads without downscaling, so small print stays legible.
+
+### Photo input
+
+The chat has two file inputs: one with `capture="environment"`, which opens the phone's camera directly, and one without it, which opens the gallery and allows several photos. Both go through `fileToImage` (downscale, JPEG). They're plain file inputs, so they work where the camera API itself is blocked, such as the claude.ai viewer.
 
 ### Suggestion cards and one-tap logging
 
@@ -116,7 +125,7 @@ Past cards are replayed to Claude as a text note (`[כרטיסי הצעה שהו
 `sendViaSubscription` calls `sample(turns, {tools, onText, modelTier, images})`:
 
 - **No system prompt:** `sample` has none, so `SYSTEM_PROMPT` plus a short framing note goes in a leading user turn. It's followed by as much recent history as fits (the input cap is 64 KiB; the app stays under about 58 KB) and the new message with `<app_state>`.
-- **Tools:** the same 13 tools are passed as page functions (`execute` runs `runTool`). Failures throw, so Claude sees `Error: …`. If the viewer allows fewer tools, they're chosen by priority (logging first). Calls with tools are never cached.
+- **Tools:** the same 15 tools are passed as page functions (`execute` runs `runTool`). Failures throw, so Claude sees `Error: …`. If the viewer allows fewer tools, they're chosen by priority (logging first). Calls with tools are never cached.
 - **Streaming and cost:** `onText` streams the whole answer so far. Every tool round is a separate request on the user's plan. Claude's model tier comes from the profile setting.
 - **Errors:** `rate_limited` (plan limit), `not_granted` (the user declined), and the other codes map to Hebrew messages. Text that already streamed is kept.
 
@@ -135,7 +144,7 @@ Past cards are replayed to Claude as a text note (`[כרטיסי הצעה שהו
 `initCloudSync` runs before the first render inside claude.ai, waiting at most 8 s:
 
 ```
-data/users/<viewer id>/core              profile, settings (model/tier, never the API key), favorites, workouts, weigh-ins
+data/users/<viewer id>/core              profile, settings (model/tier, never the API key), favorites, products, workouts, weigh-ins
 data/users/<viewer id>/core/months/<ym>  food entries + daily metrics for one month
 data/users/<viewer id>/core/chat/recent  newest chat messages (under 180 KB)
 ```

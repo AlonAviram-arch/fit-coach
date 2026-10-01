@@ -13,8 +13,8 @@ import type { ChatMessage } from './types';
 
 // Most important first, in case the viewer allows fewer tools than we have.
 const TOOL_PRIORITY = [
-  'log_food', 'update_food_entry', 'suggest_meal', 'log_workout', 'log_weigh_in', 'log_favorite',
-  'log_daily_metrics', 'delete_food_entry', 'save_favorite', 'get_history', 'set_targets', 'update_profile', 'delete_favorite',
+  'log_food', 'update_food_entry', 'suggest_meal', 'save_product', 'log_workout', 'log_weigh_in', 'log_favorite',
+  'log_daily_metrics', 'delete_food_entry', 'save_favorite', 'get_history', 'set_targets', 'update_profile', 'delete_favorite', 'delete_product',
 ];
 
 // Stay under the 64 KiB input cap with room to spare.

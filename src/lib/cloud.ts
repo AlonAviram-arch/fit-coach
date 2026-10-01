@@ -9,7 +9,7 @@ import type { AppData, ChatMessage, DailyMetric, FoodEntry } from './types';
  * between devices. localStorage stays as a fast local cache.
  *
  * Layout (documents stay well under the 256 KiB cap):
- *   data/users/<id>/core               profile, settings, favorites, workouts, weigh-ins
+ *   data/users/<id>/core               profile, settings, favorites, products, workouts, weigh-ins
  *   data/users/<id>/core/months/<ym>   food entries + daily metrics of one month
  *   data/users/<id>/core/chat/recent   the latest chat messages
  */
@@ -36,6 +36,7 @@ function splitDocs(data: AppData): Map<string, Record<string, unknown>> {
     // The API key never leaves the device.
     settings: { model: data.settings.model, tier: data.settings.tier ?? 'default' },
     favorites: data.favorites,
+    products: data.products,
     workouts: data.workouts,
     weighIns: data.weighIns,
   });
@@ -90,6 +91,7 @@ async function readRemote(core: DocRef): Promise<AppData | null> {
     version: 1,
     profile: c.profile ?? null,
     favorites: c.favorites ?? [],
+    products: c.products ?? [],
     workouts: c.workouts ?? [],
     weighIns: c.weighIns ?? [],
     food,

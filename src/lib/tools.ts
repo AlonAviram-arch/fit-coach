@@ -1,8 +1,8 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import {
-  addFood, addWeighIn, addWorkout, deleteFavorite, deleteFood, findFavorite, getData, getMetric, markFavoriteUsed,
-  saveFavorite, saveProfile, setMetric, uid, updateFood,
+  addFood, addWeighIn, addWorkout, deleteFavorite, deleteFood, deleteProduct, findFavorite, getData, getMetric,
+  markFavoriteUsed, saveFavorite, saveProduct, saveProfile, setMetric, uid, updateFood,
 } from './store';
 import {
   activeTargets, addDays, entriesForDate, MEAL_LABELS, mealForNow, nowTime, roundTotals, scaleItems, sumEntries, sumItems, today,
@@ -102,6 +102,17 @@ const schemas = {
     portion: num.min(0.1).max(5).optional(),
   }),
   delete_favorite: z.object({ favorite: z.string().min(1) }),
+  save_product: z.object({
+    name: z.string().min(1),
+    basis: z.enum(['100g', '100ml']),
+    calories: num.min(0),
+    protein: num.min(0),
+    carbs: num.min(0),
+    fat: num.min(0),
+    serving_size: num.min(0).optional(),
+    serving_label: z.string().optional(),
+  }),
+  delete_product: z.object({ product: z.string().min(1) }),
   log_daily_metrics: z.object({
     date: DateStr.optional(),
     water_ml_add: num.optional(),
@@ -290,9 +301,33 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
     input_schema: { type: 'object', properties: { favorite: { type: 'string' } }, required: ['favorite'] },
   },
   {
+    name: 'save_product',
+    description:
+      'Save the exact values read from a product nutrition label, per 100 g or per 100 ml as printed, so later mentions of the product use them instead of estimates. Call it whenever a label photo is readable. Saving an existing name replaces it.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Product name in Hebrew with the brand, as on the package, e.g. "פייבר וואן (General Mills)"' },
+        basis: { type: 'string', enum: ['100g', '100ml'], description: 'What the saved values are per' },
+        calories: { type: 'number', description: 'kcal per 100 g/ml' },
+        protein: { type: 'number', description: 'g per 100 g/ml' },
+        carbs: { type: 'number', description: 'total carbohydrates, g per 100 g/ml' },
+        fat: { type: 'number', description: 'total fat, g per 100 g/ml' },
+        serving_size: { type: 'number', description: 'Serving size from the label in g or ml, if printed' },
+        serving_label: { type: 'string', description: 'How the label names a serving, e.g. "חטיף אחד", "3 כפות"' },
+      },
+      required: ['name', 'basis', 'calories', 'protein', 'carbs', 'fat'],
+    },
+  },
+  {
+    name: 'delete_product',
+    description: 'Remove a saved product (by id or exact name).',
+    input_schema: { type: 'object', properties: { product: { type: 'string' } }, required: ['product'] },
+  },
+  {
     name: 'log_daily_metrics',
     description:
-      "Record water, steps or sleep. Use water_ml_add for 'drank 2 glasses' (a glass is about 250 ml), water_ml_total to set the day total. sleep_hours is last night's sleep.",
+      "Record water, steps or sleep. Use water_ml_add for 'drank 2 glasses' (a glass is about 250 ml, a bottle about 750 ml unless the user gives its size), water_ml_total to set the day total. sleep_hours is last night's sleep.",
     input_schema: {
       type: 'object',
       properties: {
@@ -481,6 +516,26 @@ export function runTool(name: string, rawInput: unknown): ToolOutcome {
       const fav = findFavorite(favorite);
       if (!fav || !deleteFavorite(fav.id)) return { content: `No favorite "${favorite}"`, isError: true };
       return { content: JSON.stringify({ ok: true }), isError: false, chip: { ok: true, label: `הוסר מהמועדפים: ${fav.name}` } };
+    }
+    case 'save_product': {
+      const i = input as z.infer<typeof schemas.save_product>;
+      const p = saveProduct({
+        name: i.name,
+        basis: i.basis,
+        calories: Math.round(i.calories),
+        protein: i.protein,
+        carbs: i.carbs,
+        fat: i.fat,
+        servingSize: i.serving_size,
+        servingLabel: i.serving_label,
+      });
+      return { content: JSON.stringify({ ok: true, id: p.id }), isError: false, chip: { ok: true, label: `🏷️ נשמרו ערכי התווית: ${p.name}` } };
+    }
+    case 'delete_product': {
+      const { product } = input as z.infer<typeof schemas.delete_product>;
+      const removed = deleteProduct(product);
+      if (!removed) return { content: `No saved product "${product}"`, isError: true };
+      return { content: JSON.stringify({ ok: true }), isError: false, chip: { ok: true, label: `הוסר מוצר שמור: ${removed.name}` } };
     }
     case 'log_daily_metrics': {
       const i = input as z.infer<typeof schemas.log_daily_metrics>;

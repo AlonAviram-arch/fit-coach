@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 – 2026-10-01
+
+- **Water bottles:** the water card has a "+ בקבוק" (750 ml) button next to "+ כוס" (250 ml). The coach also understands "סיימתי בקבוק".
+- **Camera button:** 📷 in the chat now opens the phone's camera directly, and a new 🖼️ button picks from the gallery. The ⭐ favorites button moved to the quick-actions row above the input.
+- **Nutrition labels:** stricter reading rules (basis column, kcal vs kJ, no estimates over a label, a calories-vs-macros check, ask when unreadable, scale to the amount eaten). New `save_product` and `delete_product` tools keep each product's exact label values, listed in the app state, so later mentions use them even though the photo is no longer in context. Photos are back at 1568 px for label legibility.
+- **More supportive tone:** the coach leads with a specific positive, responds to slip-ups with empathy and one small next step, acknowledges frustration, celebrates milestones, and still gives honest numbers.
+- A photo the browser can't read now shows a message instead of failing silently.
+
 ## 1.4.0 – 2026-09-27
 
 Claude token-cost review ([docs/COST_OPTIMIZATION.md](docs/COST_OPTIMIZATION.md)): about 40% less input per request on a realistic data set, with no change in behavior.

@@ -9,7 +9,7 @@ Conventions:
 - All UI text is Hebrew. Layout is `dir="rtl"`, so use logical CSS properties (`inset-inline-*`, `padding-inline-*`, `text-align: start`).
 - Colors come from the CSS tokens on `:root` in `src/index.css`, with a dark-mode block.
 - Keep `SYSTEM_PROMPT` byte-stable. Per-request data belongs in `buildAppState()`, not the system prompt, so the cache keeps working.
-- Every new tool needs a JSON schema in `TOOLS`, a zod schema in `schemas`, and a `case` in `runTool`. Validate input before writing to the store.
+- Every new tool needs a JSON schema in `TOOLS`, a zod schema in `schemas`, a `case` in `runTool`, and a place in `TOOL_PRIORITY` (`subscription.ts`). Validate input before writing to the store.
 - Dates are local `YYYY-MM-DD` strings. Use the helpers in `nutrition.ts`, never `toISOString()` (it converts to UTC).
 - Data shape changes must stay compatible with existing `localStorage` data (`fit-coach-data-v1`) and with backup import.
 - Never use `confirm`/`prompt`/`alert` or download links: the claude.ai viewer blocks them. Use `ask`/`confirmThen` from `src/lib/dialog.ts`.
