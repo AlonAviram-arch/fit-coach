@@ -23,10 +23,9 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
   const [images, setImages] = useState<PendingImage[]>([]);
   const [busy, setBusy] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
+  const [pickerHint, setPickerHint] = useState(false);
   const backend = useBackend(data.settings);
   const listRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const cameraRef = useRef<HTMLInputElement>(null);
 
   const totals = sumEntries(entriesForDate(data, today()));
   const targets = activeTargets(data);
@@ -35,14 +34,44 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [data.chat]);
 
-  async function onPickFiles(files: FileList | null) {
+  async function onPickFiles(files: FileList | File[] | null) {
     if (!files?.length) return;
+    setPickerHint(false);
     try {
       const picked = await Promise.all(Array.from(files).slice(0, 4).map(fileToImage));
       setImages((prev) => [...prev, ...picked].slice(0, 4));
     } catch {
       ask.notice('לא הצלחתי לקרוא את התמונה. נסו לצלם שוב או לבחור תמונה אחרת.');
     }
+  }
+
+  /**
+   * Some embedded viewers (for example an in-app browser) ignore file inputs:
+   * the tap does nothing and no event says so. When a picker really opens, the
+   * page loses focus or the input reports a change/cancel. If none of that
+   * happens shortly after the tap, show how to add a photo another way.
+   */
+  function watchPicker(e: React.MouseEvent<HTMLInputElement>) {
+    const input = e.currentTarget;
+    let opened = false;
+    const mark = () => { opened = true; };
+    const onVisibility = () => { if (document.hidden) opened = true; };
+    window.addEventListener('blur', mark);
+    document.addEventListener('visibilitychange', onVisibility);
+    input.addEventListener('change', mark);
+    input.addEventListener('cancel', mark);
+    setTimeout(() => {
+      window.removeEventListener('blur', mark);
+      document.removeEventListener('visibilitychange', onVisibility);
+      input.removeEventListener('change', mark);
+      input.removeEventListener('cancel', mark);
+      if (!opened) setPickerHint(true);
+    }, 2500);
+  }
+
+  /** Images from a paste or a drop (works where file pickers are blocked). */
+  function imageFiles(list: FileList | undefined | null): File[] {
+    return Array.from(list ?? []).filter((f) => f.type.startsWith('image/'));
   }
 
   async function send(messageText: string) {
@@ -184,28 +213,51 @@ export default function ChatScreen({ goTo }: { goTo: (t: Tab) => void }) {
             ))}
           </div>
         )}
+        {pickerHint && (
+          <p className="picker-hint" role="status">
+            נראה שבחירת תמונות חסומה בתצוגה הזו. אפשר לפתוח את האפליקציה בדפדפן (Safari או Chrome), או להעתיק תמונה ולהדביק אותה בשורת ההקלדה.
+            <button type="button" className="link" onClick={() => setPickerHint(false)} aria-label="סגירה">✕</button>
+          </p>
+        )}
         <form
           className="composer-row"
           onSubmit={(e) => {
             e.preventDefault();
             send(text);
           }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            const dropped = imageFiles(e.dataTransfer.files);
+            if (!dropped.length) return;
+            e.preventDefault();
+            onPickFiles(dropped);
+          }}
         >
-          <button type="button" className="icon-btn" onClick={() => cameraRef.current?.click()} aria-label="צילום תמונה" title="צילום" disabled={busy}>
-            📷
-          </button>
-          <button type="button" className="icon-btn" onClick={() => fileRef.current?.click()} aria-label="בחירת תמונה מהגלריה" title="מהגלריה" disabled={busy}>
-            🖼️
-          </button>
-          {/* `capture` opens the phone's camera directly; without it the gallery picker opens. */}
-          <input id="chat-camera" ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }} />
-          <input id="chat-gallery" ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }} />
+          {/*
+            The real file input sits invisibly on top of each button, so the tap lands
+            on the input itself and no script-triggered input.click() is involved.
+            `capture` opens the phone's camera directly; without it the gallery opens.
+          */}
+          <label className={busy ? 'icon-btn file-btn disabled' : 'icon-btn file-btn'} title="צילום">
+            <span aria-hidden>📷</span>
+            <input id="chat-camera" type="file" accept="image/*" capture="environment" aria-label="צילום תמונה" disabled={busy} onClick={watchPicker} onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }} />
+          </label>
+          <label className={busy ? 'icon-btn file-btn disabled' : 'icon-btn file-btn'} title="מהגלריה">
+            <span aria-hidden>🖼️</span>
+            <input id="chat-gallery" type="file" accept="image/*" multiple aria-label="בחירת תמונה מהגלריה" disabled={busy} onClick={watchPicker} onChange={(e) => { onPickFiles(e.target.files); e.target.value = ''; }} />
+          </label>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="מה אכלת / איך היה האימון?"
             rows={1}
             dir="auto"
+            onPaste={(e) => {
+              const pasted = imageFiles(e.clipboardData.files);
+              if (!pasted.length) return;
+              e.preventDefault();
+              onPickFiles(pasted);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)) {
                 e.preventDefault();

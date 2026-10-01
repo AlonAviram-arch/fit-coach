@@ -113,7 +113,9 @@ Photos are sent only with the message they're attached to; later turns carry a t
 
 ### Photo input
 
-The chat has two file inputs: one with `capture="environment"`, which opens the phone's camera directly, and one without it, which opens the gallery and allows several photos. Both go through `fileToImage` (downscale, JPEG). They're plain file inputs, so they work where the camera API itself is blocked, such as the claude.ai viewer.
+The chat has two file inputs: one with `capture="environment"`, which opens the phone's camera directly, and one without it, which opens the gallery and allows several photos. Each input is transparent and laid over its button, so the tap lands on the input itself; there is no script-triggered `input.click()`. Both go through `fileToImage` (downscale, JPEG).
+
+Images can also be pasted into the message box or dropped on the composer. Some embedded viewers ignore file inputs entirely, and no event reports that. `watchPicker` checks whether the page lost focus or the input reported `change`/`cancel` within 2.5 s of the tap; if not, a hint suggests opening the app in the browser or pasting the image.
 
 ### Suggestion cards and one-tap logging
 

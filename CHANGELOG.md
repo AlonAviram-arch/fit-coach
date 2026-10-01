@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1 – 2026-10-01
+
+- **Photo buttons made robust:** the real file input now sits invisibly on top of the 📷 and 🖼️ buttons, so a tap goes straight to it instead of through a script-triggered click.
+- **Paste and drop:** an image can be pasted into the message box or dropped on it, which works where file pickers are blocked.
+- **Blocked-picker hint:** if a photo button is tapped and no picker opens (some in-app viewers ignore file inputs), the app says so and suggests opening it in the browser or pasting the image.
+
 ## 1.5.0 – 2026-10-01
 
 - **Water bottles:** the water card has a "+ בקבוק" (750 ml) button next to "+ כוס" (250 ml). The coach also understands "סיימתי בקבוק".
